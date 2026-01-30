@@ -5,11 +5,31 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import HomepageFeatures from '@site/src/components/HomepageFeatures';
 import Heading from '@theme/Heading';
+import { useEffect, useState } from 'react';
+import ExecutionEnvironment from '@docusaurus/ExecutionEnvironment';
 
 import styles from './index.module.css';
 
 function HomepageHeader() {
   const {siteConfig} = useDocusaurusContext();
+  const [stats, setStats] = useState({ documents: 0, categories: 0 });
+  
+  useEffect(() => {
+    // Only fetch in browser environment
+    if (!ExecutionEnvironment.canUseDOM) return;
+    
+    // Fetch some basic stats from our API
+    fetch('/api/content/manifest')
+      .then(res => res.json())
+      .then(data => {
+        setStats({
+          documents: data.documents?.length || 0,
+          categories: 0 // Will add category count later
+        });
+      })
+      .catch(err => console.log('Failed to fetch stats:', err));
+  }, []);
+  
   return (
     <header className={clsx('hero hero--primary', styles.heroBanner)}>
       <div className="container">
@@ -17,11 +37,21 @@ function HomepageHeader() {
           {siteConfig.title}
         </Heading>
         <p className="hero__subtitle">{siteConfig.tagline}</p>
+        {ExecutionEnvironment.canUseDOM && (
+          <p className="hero__subtitle text--secondary">
+            📊 {stats.documents} documents in database | ⚡ Real-time editing
+          </p>
+        )}
         <div className={styles.buttons}>
           <Link
             className="button button--secondary button--lg"
-            to="/docs/intro">
-            Docusaurus Tutorial - 5min ⏱️
+            to="/intro">
+            Get Started - 5min ⏱️
+          </Link>
+          <Link
+            className="button button--outline button--lg margin-left--md"
+            to="/installation">
+            Installation Guide
           </Link>
         </div>
       </div>
@@ -33,8 +63,8 @@ export default function Home(): ReactNode {
   const {siteConfig} = useDocusaurusContext();
   return (
     <Layout
-      title={`Hello from ${siteConfig.title}`}
-      description="Description will go into a meta tag in <head />">
+      title={`${siteConfig.title} - Dynamic Documentation Platform`}
+      description="Database-driven documentation with real-time editing powered by Docusaurus and Cloudflare">
       <HomepageHeader />
       <main>
         <HomepageFeatures />

@@ -1,7 +1,7 @@
 # Docusaurus + Database Notes Platform - Project Plan
 
 ## Overview
-A dynamic documentation platform using authentic Docusaurus with database-driven markdown content, deployed on Cloudflare Workers with D1 database integration. The platform provides Docusaurus's native documentation experience while enabling real-time CRUD operations on markdown content through a database backend. Single-user application with Cloudflare Zero Trust authentication.
+A dynamic documentation platform using authentic Docusaurus with database-driven markdown content, deployed on Cloudflare Workers with D1 database integration. The platform provides Docusaurus's native documentation experience while enabling real-time CRUD operations on markdown content through a database backend. Single-user application with direct inline editing.
 
 ## Architecture Overview
 
@@ -9,14 +9,14 @@ A dynamic documentation platform using authentic Docusaurus with database-driven
 - **Frontend**: Authentic Docusaurus documentation site
 - **Content Source**: Dynamic loading from D1 database instead of static files
 - **Backend**: Cloudflare Workers API for markdown CRUD operations
-- **Deployment**: Hybrid approach - Docusaurus build + Workers API on Cloudflare
-- **Content Management**: Web-based editor for creating/editing markdown content
+- **Navigation**: Dynamic sidebar generation from API, not static builds
+- **Content Management**: Inline editing with pencil icon (single-user)
 
 ### Key Benefits
 - Native Docusaurus experience (navigation, search, theming)
-- Real-time content updates without rebuilds
+- Real-time content updates from database
 - Database-backed content with full CRUD capabilities
-- Seamless integration with Cloudflare ecosystem
+- Dynamic navigation and content loading
 - Maintains all Docusaurus features (plugins, themes, etc.)
 
 ## Docusaurus Design Specifications
@@ -47,33 +47,33 @@ A dynamic documentation platform using authentic Docusaurus with database-driven
 
 ## Tech Stack
 - **Documentation Platform**: Docusaurus v3.x
-- **Content Management**: Custom web-based markdown editor
+- **Content Management**: Inline markdown editor with direct page editing
 - **Backend**: Cloudflare Workers (API endpoints)
 - **Database**: Cloudflare D1 SQLite (markdown content storage)
-- **Authentication**: Cloudflare Zero Trust Application
-- **Deployment**: Cloudflare Pages (Docusaurus) + Workers (API)
+- **Authentication**: Simple single-user access
+- **Deployment**: Cloudflare Workers (unified deployment)
 - **Content Loading**: Custom Docusaurus plugin for database content
 - **Local Development**: D1 local development + Docusaurus dev server
 
-## Hybrid Architecture
+## Dynamic Architecture
 
 ### Docusaurus Site (Frontend)
 - Standard Docusaurus documentation site
 - Custom plugin to load content from API instead of filesystem
 - Real-time content updates via API integration
 - Native Docusaurus navigation, search, and theming
-- Admin interface overlay for content management
+- Inline edit interface with pencil icons
 
 ### Cloudflare Workers API (Backend)
 - RESTful API endpoints for markdown CRUD operations
 - Content serving endpoints for Docusaurus consumption
-- File system simulation for Docusaurus compatibility
-- Authentication middleware integration
+- Dynamic sidebar generation from database
+- Simple authentication for single-user access
 
 ### Content Flow
 1. **Read**: Docusaurus loads content via custom plugin → API → Database
-2. **Write**: Admin editor → API → Database → Trigger Docusaurus refresh
-3. **Deploy**: Docusaurus build uses API content → Static build → Cloudflare Pages
+2. **Navigate**: Sidebar generated dynamically from database categories
+3. **Edit**: Click pencil icon → Modal editor → API → Database → Real-time update
 
 ## Core Features
 
@@ -91,11 +91,11 @@ A dynamic documentation platform using authentic Docusaurus with database-driven
 - Hierarchical organization (categories, subcategories)
 - Slug-based URL routing maintained
 
-### 3. Web-Based Content Editor
-- Integrated markdown editor with live preview
+### 3. Inline Content Editor
+- Modal markdown editor with live preview
 - Docusaurus-compatible frontmatter editing
-- Image upload and asset management
-- Draft/publish workflow
+- Direct page editing via pencil icon
+- Auto-save functionality
 - Content validation and error checking
 
 ### 4. Docusaurus Plugin Integration
@@ -105,17 +105,11 @@ A dynamic documentation platform using authentic Docusaurus with database-driven
 - Custom sidebar generation from database hierarchy
 - SEO optimization with dynamic meta generation
 
-### 5. Content Synchronization
-- Real-time content updates across all users
-- Automatic content refresh in Docusaurus
-- Build trigger system for static generation
-- Content caching and performance optimization
-
-### 6. Admin Interface
-- Overlay admin panel on Docusaurus site
-- Content management dashboard
-- User authentication integration
-- Content analytics and usage tracking
+### 5. Real-time Updates
+- Instant content updates from database
+- Dynamic sidebar generation
+- No build triggers needed
+- Client-side content refresh
 
 ## Database Schema (D1)
 
@@ -177,22 +171,7 @@ CREATE TABLE document_versions (
 CREATE INDEX idx_document_versions_doc ON document_versions(document_id);
 ```
 
-### Assets Table (Images and Files)
-```sql
-CREATE TABLE assets (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    filename TEXT NOT NULL,
-    original_name TEXT NOT NULL,
-    mime_type TEXT NOT NULL,
-    size_bytes INTEGER NOT NULL,
-    storage_path TEXT NOT NULL, -- Cloudflare R2 or similar
-    document_id INTEGER, -- Optional association
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE SET NULL
-);
 
-CREATE INDEX idx_assets_document ON assets(document_id);
-```
 
 ## API Endpoints (Worker Routes)
 
@@ -200,10 +179,10 @@ CREATE INDEX idx_assets_document ON assets(document_id);
 - `GET /api/content/sidebar` - Generate Docusaurus sidebar structure
 - `GET /api/content/documents/:slug` - Get document markdown content
 - `GET /api/content/documents/:slug/metadata` - Get document frontmatter
-- `GET /api/content/manifest` - Get all documents for build process
+- `GET /api/content/manifest` - Get all documents for plugin
 - `GET /api/content/search-index` - Generate search index for Docusaurus
 
-### Admin API (For Content Management)
+### Edit API (For Inline Content Management)
 - `GET /api/admin/documents` - List all documents with filtering
 - `GET /api/admin/documents/:id` - Get document for editing
 - `POST /api/admin/documents` - Create new document
@@ -218,16 +197,6 @@ CREATE INDEX idx_assets_document ON assets(document_id);
 - `DELETE /api/admin/categories/:id` - Delete category
 - `PUT /api/admin/categories/:id/reorder` - Reorder categories
 
-### Assets API
-- `POST /api/admin/assets/upload` - Upload images/files
-- `GET /api/admin/assets` - List uploaded assets
-- `DELETE /api/admin/assets/:id` - Delete asset
-
-### Build & Deployment
-- `POST /api/admin/build/trigger` - Trigger Docusaurus rebuild
-- `GET /api/admin/build/status` - Get build status
-- `POST /api/admin/deploy` - Deploy to production
-
 ## File Structure Plan
 
 ```
@@ -236,11 +205,11 @@ docusaurus-site/
 ├── package.json
 ├── src/
 │   ├── components/
-│   │   ├── AdminPanel/
+│   │   ├── EditInterface/
 │   │   │   ├── DocumentEditor.js
-│   │   │   ├── CategoryManager.js
-│   │   │   ├── AssetUploader.js
-│   │   │   └── AdminOverlay.js
+│   │   │   ├── EditModal.js
+│   │   │   ├── EditButton.js
+│   │   │   └── CategoryManager.js
 │   │   ├── ContentLoader/
 │   │   │   ├── DatabaseContent.js
 │   │   │   └── ContentProvider.js
@@ -252,18 +221,12 @@ docusaurus-site/
 │   │   │   ├── contentLoader.js
 │   │   │   ├── sidebarGenerator.js
 │   │   │   └── markdownProcessor.js
-│   │   └── admin-interface-plugin/
+│   │   └── inline-edit-plugin/
 │   │       ├── index.js
-│   │       └── adminRoutes.js
-│   ├── pages/
-│   │   ├── admin/
-│   │   │   ├── index.js
-│   │   │   ├── documents.js
-│   │   │   └── categories.js
-│   │   └── index.js
+│   │       └── editIntegration.js
 │   └── css/
 │       ├── custom.css
-│       └── admin.css
+│       └── edit-interface.css
 ├── static/
 │   └── img/
 └── docs/ (fallback/example content)
@@ -290,7 +253,7 @@ api-server/ (Cloudflare Workers)
 │   │   ├── frontmatter.js
 │   │   └── hierarchy.js
 │   └── index.js
-├── wrangler.toml
+├── wrangler.jsonc
 └── package.json
 
 shared/
@@ -341,27 +304,27 @@ shared/
 
 ## Implementation Priority
 
-1. **Database Schema Setup** (hierarchical documents and categories)
-2. **Cloudflare Workers API** (content CRUD and serving endpoints)
+1. **Database Schema Setup** (hierarchical documents and categories) ✅
+2. **Cloudflare Workers API** (content CRUD and serving endpoints) ✅
 3. **Docusaurus Custom Plugin** (database content loading)
-4. **Admin Interface Integration** (overlay on Docusaurus site)
-5. **Content Editor Component** (markdown editing with live preview)
-6. **Asset Management System** (image uploads and file handling)
-7. **Build & Deployment Pipeline** (automated Docusaurus builds)
-8. **Authentication Integration** (Zero Trust + admin access)
-9. **Search Enhancement** (database content indexing)
-10. **Performance Optimization** (caching and CDN integration)
+4. **Inline Edit Interface** (pencil icon and modal editor)
+5. **Dynamic Sidebar Generation** (from database categories)
+6. **Content Editor Component** (markdown editing with live preview)
+7. **Single-user Authentication** (simple access control)
+8. **Search Enhancement** (database content indexing)
+9. **Performance Optimization** (API caching)
+10. **Production Deployment** (unified Workers deployment)
 
 ## Development Workflow
 
 ### Local Development
-1. **API Server**: Run Wrangler dev for Workers + D1 local
-2. **Docusaurus**: Run `npm start` with local API endpoints
-3. **Content Sync**: Real-time updates from database to Docusaurus
-4. **Admin Access**: Overlay admin interface for content management
+1. **API Server**: Run Wrangler dev for Workers + D1 local (using wrangler.jsonc)
+2. **Docusaurus**: Integrated with Workers dev server
+3. **Dynamic Content**: Real-time updates from database
+4. **Inline Editing**: Edit interface accessible on all pages
 
 ### Production Deployment
-1. **API**: Deploy Workers to Cloudflare with production D1
-2. **Docusaurus**: Build static site and deploy to Cloudflare Pages
-3. **Integration**: Configure custom domain and routing
-4. **CDN**: Optimize asset delivery and caching strategies
+1. **Unified Deployment**: Single Workers deployment with Docusaurus build
+2. **Database**: Production D1 database
+3. **Domain**: Custom domain configuration
+4. **Optimization**: Content delivery and caching
