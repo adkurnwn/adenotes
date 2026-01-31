@@ -63,6 +63,26 @@ async function contentDidLoad({ content, actions, allContent, options }) {
   
   if (!content.documents || content.documents.length === 0) {
     console.warn('⚠️ No documents loaded from database');
+    
+    // Create fallback routes for expected documents when API is unavailable
+    const fallbackDocuments = [
+      { slug: 'intro', title: 'Introduction' },
+      { slug: 'installation', title: 'Installation' },
+      { slug: 'getting-started', title: 'Getting Started' }
+    ];
+    
+    console.log('🔄 Creating fallback routes for dynamic content loading...');
+    
+    for (const doc of fallbackDocuments) {
+      addRoute({
+        path: `/${doc.slug}`,
+        component: '@site/src/components/DatabaseDocument',
+        exact: true,
+        modules: {},
+      });
+    }
+    
+    console.log(`✅ Created ${fallbackDocuments.length} fallback routes`);
     return;
   }
   

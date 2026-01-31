@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Layout from '@theme/Layout';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import ExecutionEnvironment from '@docusaurus/ExecutionEnvironment';
@@ -12,11 +12,14 @@ export default function DatabaseDocument(props) {
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const hasFetched = useRef(false);
   
   // Get document data passed from plugin
-  const documentData = props.documentData || {};
+  const documentData = props.documentData;
   
   useEffect(() => {
+    console.log('DatabaseDocument useEffect triggered', { documentData, hasFetched: hasFetched.current });
+    
     // Only run in browser environment
     if (!ExecutionEnvironment.canUseDOM) {
       setLoading(false);
@@ -25,18 +28,27 @@ export default function DatabaseDocument(props) {
     
     // If we have document data from props, use it
     if (documentData && Object.keys(documentData).length > 0) {
+      console.log('Using document data from props');
       setDocument(documentData);
       setLoading(false);
       return;
     }
     
-    // Otherwise, try to fetch from current path
-    const currentPath = window.location.pathname.replace(/^\/|\/$/g, '');
-    fetchDocumentBySlug(currentPath);
-  }, [documentData]);
+    // Otherwise, try to fetch from current path (only once)
+    if (!hasFetched.current) {
+      console.log('Fetching document for first time');
+      hasFetched.current = true;
+      const currentPath = window.location.pathname.replace(/^\/|\/$/g, '');
+      fetchDocumentBySlug(currentPath);
+    } else {
+      console.log('Already fetched, skipping');
+    }
+  }, []); // Empty dependency array to run only once
   
   const fetchDocumentBySlug = async (slug) => {
     if (!ExecutionEnvironment.canUseDOM) return;
+    
+    console.log('fetchDocumentBySlug called with:', slug);
     
     try {
       setLoading(true);
@@ -47,6 +59,7 @@ export default function DatabaseDocument(props) {
       }
       
       const data = await response.json();
+      console.log('Document fetched successfully:', data.title);
       setDocument(data);
       setError(null);
     } catch (err) {
