@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { useLocation } from '@docusaurus/router';
 import DocSidebar from '@theme/DocSidebar';
-import { useThemeConfig } from '@docusaurus/theme-common';
+import { useThemeConfig, useWindowSize } from '@docusaurus/theme-common';
+import { useNavbarSecondaryMenu } from '@docusaurus/theme-common/internal';
 
 /**
  * Wrapper component to use the native Docusaurus DocSidebar
@@ -9,6 +10,16 @@ import { useThemeConfig } from '@docusaurus/theme-common';
  */
 export default function ResponsiveSidebar({ sidebarItems, path, isHidden, onCollapse }) {
     const location = useLocation();
+    const windowSize = useWindowSize();
+    const secondaryMenu = useNavbarSecondaryMenu();
+
+    // Automatically show the secondary menu (sidebar) when on mobile
+    // This allows the hamburger menu to open directly to the docs sidebar
+    React.useEffect(() => {
+        if (windowSize === 'mobile' && secondaryMenu?.show) {
+            secondaryMenu.show();
+        }
+    }, [windowSize, secondaryMenu]);
 
     // Transform our simple sidebar items to what Docusaurus DocSidebar expects
     const transformItems = (items) => {
