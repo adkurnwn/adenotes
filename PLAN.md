@@ -317,11 +317,40 @@ shared/
 
 ## Development Workflow
 
+### **CRITICAL DEVELOPMENT CONSTRAINTS**
+⚠️ **FOR AI AGENTS**: This project has specific development requirements that must be followed:
+
+1. **ALWAYS USE `npm run preview` for testing** - Never use `npm start` or `npm run dev`
+   - `npm run preview` = `npm run build && wrangler dev`
+   - This serves both API and frontend on the same port 8787
+   - This is the ONLY way to test the unified interface
+
+2. **Single Port Architecture (8787)**
+   - API endpoints: `http://127.0.0.1:8787/api/*`
+   - Frontend pages: `http://127.0.0.1:8787/*`
+   - No separate dev servers - everything runs through Cloudflare Workers
+
+3. **API URL Configuration**
+   - Local: `http://127.0.0.1:8787/api`
+   - Production: `https://notes.adekurniawan.me` (custom domain)
+   - The `docusaurus.config.ts` switches between these automatically
+
+4. **Build Process**
+   - During build, API may not be available → builds with fallback routes
+   - Runtime content loading happens via client-side API calls
+   - This is intentional and working as designed
+
+**DO NOT**:
+- Use `npm start` (separate Docusaurus dev server)
+- Use `wrangler dev` alone (missing Docusaurus build)
+- Try to run separate servers on different ports
+- Suggest changing this architecture
+
 ### Local Development
-1. **API Server**: Run Wrangler dev for Workers + D1 local (using wrangler.jsonc)
-2. **Docusaurus**: Integrated with Workers dev server
-3. **Dynamic Content**: Real-time updates from database
-4. **Inline Editing**: Edit interface accessible on all pages
+1. **Unified Interface**: Run `npm run preview` for both API and frontend on port 8787
+2. **Database**: D1 local development automatically configured
+3. **Dynamic Content**: Real-time updates from database via unified API
+4. **Inline Editing**: Edit interface accessible on all pages at runtime
 
 ### Production Deployment
 1. **Unified Deployment**: Single Workers deployment with Docusaurus build
