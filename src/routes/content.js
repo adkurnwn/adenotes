@@ -12,6 +12,7 @@ contentRoutes.get('/sidebar', async (c) => {
       SELECT c.*, d.id as doc_id, d.title as doc_title, d.slug as doc_slug
       FROM categories c
       LEFT JOIN documents d ON c.id = d.category_id AND d.is_published = 1
+      WHERE c.slug != 'archived'
       ORDER BY c.sidebar_position, d.sidebar_position
     `).all()
 
@@ -31,7 +32,8 @@ contentRoutes.get('/sidebar', async (c) => {
       sidebarStructure.push(...uncategorized.results.map(doc => ({
         type: 'doc',
         id: doc.slug,
-        label: doc.title
+        label: doc.title,
+        customProps: { docId: doc.id }
       })))
     }
 
@@ -157,7 +159,8 @@ function buildSidebarHierarchy(categories) {
       categoryMap.get(row.id).items.push({
         type: 'doc',
         id: docPath,
-        label: row.doc_title
+        label: row.doc_title,
+        customProps: { docId: row.doc_id } // Add DB ID for actions
       })
     }
   })

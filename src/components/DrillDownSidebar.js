@@ -5,7 +5,7 @@ import { useThemeConfig } from '@docusaurus/theme-common';
 import IconArrow from '@theme/Icon/Arrow';
 import styles from './DrillDownSidebar.module.css';
 
-export default function DrillDownSidebar({ sidebarItems, isHidden, onCollapse }) {
+export default function DrillDownSidebar({ sidebarItems, isHidden, onCollapse, onCreateRoot }) {
     const location = useLocation();
     const [viewStack, setViewStack] = useState([]);
 
@@ -44,6 +44,9 @@ export default function DrillDownSidebar({ sidebarItems, isHidden, onCollapse })
                     className="menu__link menu__link--sublist"
                     onClick={() => handleNavigate(item)}
                     style={{ cursor: 'pointer', justifyContent: 'space-between' }}
+                    data-context-id={item.customProps?.categoryId}
+                    data-context-type="category"
+                    data-context-label={item.label}
                 >
                     {'📂 ' + item.label}
                     {/* Standard Docusaurus arrow is usually pseudo-element, but we use explicit for drill indication */}
@@ -53,6 +56,9 @@ export default function DrillDownSidebar({ sidebarItems, isHidden, onCollapse })
                 <Link
                     to={item.href || `/${item.id}`}
                     className={`menu__link ${location.pathname === (item.href || `/${item.id}`) ? 'menu__link--active' : ''}`}
+                    data-context-id={item.customProps?.docId}
+                    data-context-type="doc"
+                    data-context-label={item.label}
                 >
                     {'📝 ' + item.label}
                 </Link>
@@ -117,6 +123,20 @@ export default function DrillDownSidebar({ sidebarItems, isHidden, onCollapse })
         );
     };
 
+    const [isCreating, setIsCreating] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
+
+    const handleCreateSubmit = (e) => {
+        if (e.key === 'Enter' && newCategoryName.trim()) {
+            onCreateRoot(newCategoryName.trim());
+            setIsCreating(false);
+            setNewCategoryName('');
+        } else if (e.key === 'Escape') {
+            setIsCreating(false);
+            setNewCategoryName('');
+        }
+    };
+
     const renderRootView = () => (
         <ul className="menu__list">
             {sidebarItems.map((rootItem, idx) => {
@@ -134,6 +154,9 @@ export default function DrillDownSidebar({ sidebarItems, isHidden, onCollapse })
                                         toggleRoot(idx);
                                     }}
                                     style={{ cursor: 'pointer' }}
+                                    data-context-id={rootItem.customProps?.categoryId}
+                                    data-context-type="category"
+                                    data-context-label={rootItem.label}
                                 >
                                     <a
                                         className="menu__link menu__link--sublist menu__link--sublist-caret"
@@ -155,6 +178,9 @@ export default function DrillDownSidebar({ sidebarItems, isHidden, onCollapse })
                                     <Link
                                         to={rootItem.href || `/${rootItem.id}`}
                                         className={`menu__link ${location.pathname === (rootItem.href || `/${rootItem.id}`) ? 'menu__link--active' : ''}`}
+                                        data-context-id={rootItem.customProps?.docId}
+                                        data-context-type="doc"
+                                        data-context-label={rootItem.label}
                                     >
                                         {'📝 ' + rootItem.label}
                                     </Link>
@@ -164,6 +190,47 @@ export default function DrillDownSidebar({ sidebarItems, isHidden, onCollapse })
                     </React.Fragment>
                 )
             })}
+
+            {/* New Root Category Button/Input */}
+            <li className="menu__list-item">
+                {isCreating ? (
+                    <div className="menu__link" style={{ padding: '0.2rem 0.5rem', cursor: 'default' }}>
+                        <input
+                            autoFocus
+                            type="text"
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            onKeyDown={handleCreateSubmit}
+                            onBlur={() => { if (!newCategoryName.trim()) setIsCreating(false); }}
+                            placeholder="Category Name..."
+                            style={{
+                                width: '100%',
+                                background: 'transparent',
+                                border: '1px solid var(--ifm-color-emphasis-300)',
+                                color: 'var(--ifm-font-color-base)',
+                                borderRadius: '4px',
+                                padding: '4px 8px',
+                                fontSize: 'inherit'
+                            }}
+                        />
+                    </div>
+                ) : (
+                    <button
+                        className="button button--secondary button--block button--sm"
+                        style={{
+                            margin: '0.5rem 0',
+                            textAlign: 'left',
+                            background: 'transparent',
+                            borderColor: 'transparent',
+                            color: 'var(--ifm-color-content-secondary)',
+                            paddingLeft: '1rem'
+                        }}
+                        onClick={() => setIsCreating(true)}
+                    >
+                        + New Category
+                    </button>
+                )}
+            </li>
         </ul>
     );
 

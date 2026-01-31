@@ -9,6 +9,7 @@ import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import 'highlight.js/styles/github.css';
 import DocumentEditor from './DocumentEditor';
+import ConfirmationModal from './ConfirmationModal';
 
 /**
  * Component to render documents loaded from database
@@ -22,6 +23,7 @@ export default function DatabaseDocument(props) {
   const [error, setError] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSidebarHidden, setIsSidebarHidden] = useState(false);
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -121,21 +123,36 @@ export default function DatabaseDocument(props) {
       const savedDoc = await response.json();
 
       if (isNew) {
-        alert('Document created!');
-        // Redirect to the new document URL
-        const newPath = savedDoc.category_slug
-          ? `/${savedDoc.category_slug}/${savedDoc.slug}`
-          : `/${savedDoc.slug}`;
-        window.location.href = newPath;
+        setAlertModal({
+          isOpen: true,
+          title: 'Success',
+          message: 'Document created successfully!',
+          onConfirm: () => {
+            const newPath = savedDoc.category_slug
+              ? `/${savedDoc.category_slug}/${savedDoc.slug}`
+              : `/${savedDoc.slug}`;
+            window.location.href = newPath;
+          }
+        });
       } else {
         setDocument({ ...document, content: newContent });
         setIsEditing(false);
-        alert('Document saved successfully!');
+        setAlertModal({
+          isOpen: true,
+          title: 'Success',
+          message: 'Document saved successfully!',
+          onConfirm: null
+        });
       }
 
     } catch (err) {
       console.error('Save error:', err);
-      alert('Error saving document: ' + err.message);
+      setAlertModal({
+        isOpen: true,
+        title: 'Error',
+        message: 'Error saving document: ' + err.message,
+        onConfirm: null
+      });
     }
   };
 
@@ -273,6 +290,18 @@ export default function DatabaseDocument(props) {
           </div>
         </main>
       </div>
+
+      <ConfirmationModal
+        isOpen={alertModal.isOpen}
+        title={alertModal.title}
+        message={alertModal.message}
+        onConfirm={() => {
+          if (alertModal.onConfirm) alertModal.onConfirm();
+          setAlertModal(prev => ({ ...prev, isOpen: false }));
+        }}
+        cancelText={null}
+        confirmText="OK"
+      />
     </Layout>
   );
 }

@@ -2,6 +2,24 @@ import { Hono } from 'hono'
 
 const adminRoutes = new Hono()
 
+// Helper to ensure unique slugs
+async function getUniqueSlug(db, table, baseSlug, excludeId = null) {
+  let slug = baseSlug;
+  let count = 0;
+  while (true) {
+    let query = `SELECT id FROM ${table} WHERE slug = ?`;
+    const params = [slug];
+    if (excludeId) {
+      query += ' AND id != ?';
+      params.push(excludeId);
+    }
+    const existing = await db.prepare(query).bind(...params).first();
+    if (!existing) return slug;
+    count++;
+    slug = `${baseSlug}-${count}`;
+  }
+}
+
 // List all documents with filtering
 adminRoutes.get('/documents', async (c) => {
   try {
@@ -80,11 +98,10 @@ adminRoutes.post('/documents', async (c) => {
     // Default values if undefined
     const { title, slug, content, frontmatter, category_id, is_draft } = body
 
-    // Check if slug already exists
-    const existing = await db.prepare('SELECT id FROM documents WHERE slug = ?').bind(slug).first()
-    if (existing) {
-      return c.json({ error: 'Slug already exists' }, 400)
-    }
+    // Ensure unique slug
+    const uniqueSlug = await getUniqueSlug(db, 'documents', slug);
+
+    // ...
 
     const frontmatterJson = frontmatter ? JSON.stringify(frontmatter) : null
 
@@ -97,7 +114,7 @@ adminRoutes.post('/documents', async (c) => {
     const result = await db.prepare(`
       INSERT INTO documents (title, slug, content, frontmatter, category_id, is_draft, is_published)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(title, slug, content, frontmatterJson, bindCategoryId, bindIsDraft, bindIsPublished).run()
+    `).bind(title, uniqueSlug, content, frontmatterJson, bindCategoryId, bindIsDraft, bindIsPublished).run()
 
     // Create initial version
     await db.prepare(`
@@ -130,11 +147,9 @@ adminRoutes.put('/documents/:id', async (c) => {
     const { title, slug, content, frontmatter, category_id, is_draft } = body
 
     // Check if new slug conflicts with existing documents (excluding current)
+    let uniqueSlug = slug;
     if (slug) {
-      const existing = await db.prepare('SELECT id FROM documents WHERE slug = ? AND id != ?').bind(slug, id).first()
-      if (existing) {
-        return c.json({ error: 'Slug already exists' }, 400)
-      }
+      uniqueSlug = await getUniqueSlug(db, 'documents', slug, id);
     }
 
     const frontmatterJson = frontmatter ? JSON.stringify(frontmatter) : null
@@ -158,7 +173,7 @@ adminRoutes.put('/documents/:id', async (c) => {
       SET title = ?, slug = ?, content = ?, frontmatter = ?, category_id = ?, 
           is_draft = ?, is_published = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).bind(title, slug, content, frontmatterJson, bindCategoryId, bindIsDraft, bindIsPublished, id).run()
+    `).bind(title, uniqueSlug, content, frontmatterJson, bindCategoryId, bindIsDraft, bindIsPublished, id).run()
 
     // Create new version
     await db.prepare(`
@@ -218,16 +233,13 @@ adminRoutes.post('/categories', async (c) => {
 
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 
-    // Check slug uniqueness
-    const existing = await db.prepare('SELECT id FROM categories WHERE slug = ?').bind(slug).first()
-    if (existing) {
-      return c.json({ error: 'Category with this name already exists' }, 400)
-    }
+    // Ensure slug uniqueness
+    const uniqueSlug = await getUniqueSlug(db, 'categories', slug);
 
     const result = await db.prepare(`
       INSERT INTO categories (name, slug, parent_id, sidebar_position)
       VALUES (?, ?, ?, 0)
-    `).bind(name, slug, parent_id || null).run()
+    `).bind(name, uniqueSlug, parent_id || null).run()
 
     return c.json({
       id: result.meta.last_row_id,
@@ -239,6 +251,48 @@ adminRoutes.post('/categories', async (c) => {
   } catch (error) {
     console.error('Failed to create category:', error);
     return c.json({ error: 'Failed to create category' }, 500)
+  }
+})
+
+// Archive item (soft delete - move to Archived category)
+adminRoutes.post('/archive', async (c) => {
+  try {
+    const db = c.env.note_ade_db
+    const { id, type } = await c.req.json()
+
+    if (!id || !type) {
+      return c.json({ error: 'ID and Type are required' }, 400)
+    }
+
+    // 1. Find or Create "Archived" category
+    let archiveCat = await db.prepare('SELECT id FROM categories WHERE slug = ?').bind('archived').first()
+
+    if (!archiveCat) {
+      const result = await db.prepare(`
+        INSERT INTO categories (name, slug, parent_id, sidebar_position)
+        VALUES ('Archived', 'archived', NULL, 9999)
+      `).run()
+      archiveCat = { id: result.meta.last_row_id }
+    }
+
+    // 2. Move item to Archived
+    if (type === 'category') {
+      // Prevent archiving the Archive category itself
+      if (Number(id) === archiveCat.id) {
+        return c.json({ error: 'Cannot archive the Archive category' }, 400)
+      }
+
+      await db.prepare('UPDATE categories SET parent_id = ? WHERE id = ?').bind(archiveCat.id, id).run()
+    } else if (type === 'doc') {
+      await db.prepare('UPDATE documents SET category_id = ? WHERE id = ?').bind(archiveCat.id, id).run()
+    } else {
+      return c.json({ error: 'Invalid type' }, 400)
+    }
+
+    return c.json({ message: 'Moved to Archive successfully' })
+  } catch (error) {
+    console.error('Archive failed:', error);
+    return c.json({ error: 'Failed to archive item' }, 500)
   }
 })
 
