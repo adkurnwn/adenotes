@@ -206,4 +206,40 @@ adminRoutes.post('/documents/:id/publish', async (c) => {
   }
 })
 
+// Create new category
+adminRoutes.post('/categories', async (c) => {
+  try {
+    const db = c.env.note_ade_db
+    const { name, parent_id } = await c.req.json()
+
+    if (!name) {
+      return c.json({ error: 'Name is required' }, 400)
+    }
+
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+
+    // Check slug uniqueness
+    const existing = await db.prepare('SELECT id FROM categories WHERE slug = ?').bind(slug).first()
+    if (existing) {
+      return c.json({ error: 'Category with this name already exists' }, 400)
+    }
+
+    const result = await db.prepare(`
+      INSERT INTO categories (name, slug, parent_id, sidebar_position)
+      VALUES (?, ?, ?, 0)
+    `).bind(name, slug, parent_id || null).run()
+
+    return c.json({
+      id: result.meta.last_row_id,
+      name,
+      slug,
+      parent_id,
+      message: 'Category created successfully'
+    })
+  } catch (error) {
+    console.error('Failed to create category:', error);
+    return c.json({ error: 'Failed to create category' }, 500)
+  }
+})
+
 export { adminRoutes }

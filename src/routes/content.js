@@ -132,6 +132,7 @@ contentRoutes.get('/search-index', async (c) => {
 })
 
 // Helper function to build sidebar hierarchy
+// Helper function to build sidebar hierarchy
 function buildSidebarHierarchy(categories) {
   const categoryMap = new Map()
   const rootCategories = []
@@ -145,6 +146,7 @@ function buildSidebarHierarchy(categories) {
         collapsible: row.is_collapsible,
         collapsed: row.is_collapsed,
         customProps: { categoryId: row.id },
+        parentId: row.parent_id,
         items: []
       })
     }
@@ -160,15 +162,15 @@ function buildSidebarHierarchy(categories) {
     }
   })
 
-  // Second pass: build hierarchy
-  categories.forEach(row => {
-    const category = categoryMap.get(row.id)
-    if (row.parent_id && categoryMap.has(row.parent_id)) {
-      categoryMap.get(row.parent_id).items.push(category)
-    } else if (!row.parent_id) {
+  // Second pass: build hierarchy using unique categories
+  for (const category of categoryMap.values()) {
+    if (category.parentId && categoryMap.has(category.parentId)) {
+      categoryMap.get(category.parentId).items.push(category)
+    } else {
       rootCategories.push(category)
     }
-  })
+    delete category.parentId;
+  }
 
   return rootCategories
 }

@@ -22,15 +22,31 @@ export default function ResponsiveSidebar({ sidebarItems, path, isHidden, onColl
     }, [windowSize, secondaryMenu]);
 
     // Transform our simple sidebar items to what Docusaurus DocSidebar expects
+    // Transform our simple sidebar items to what Docusaurus DocSidebar expects
     const transformItems = (items) => {
         return items.map(item => {
             if (item.type === 'category') {
+                let children = transformItems(item.items);
+
+                // Fix: Docusaurus hides empty categories.
+                // Inject a placeholder so the category is rendered and actionable with right-click.
+                if (children.length === 0) {
+                    children = [{
+                        type: 'link',
+                        label: '(Empty)',
+                        href: '#',
+                        className: 'menu__list-item--placeholder',
+                        customProps: { isEmptyPlaceholder: true }
+                    }];
+                }
+
                 return {
                     type: 'category',
                     label: item.label,
-                    items: transformItems(item.items),
-                    collapsed: item.collapsed !== false,
-                    collapsible: true,
+                    items: children,
+                    // Fix boolean conversion from SQLite (0/1)
+                    collapsed: !!item.collapsed,
+                    collapsible: !!item.collapsible,
                 };
             }
             if (item.type === 'doc') {

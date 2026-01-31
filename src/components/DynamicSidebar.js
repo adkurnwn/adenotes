@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from '@docusaurus/router';
 import { getSidebarStructure } from '../plugins/database-content-plugin/clientModule';
-import ResponsiveSidebar from './ResponsiveSidebar';
+import DrillDownSidebar from './DrillDownSidebar';
 import styles from './DynamicSidebar.module.css';
 
 /**
- * Container component that fetches data and renders the ResponsiveSidebar
+ * Container component that fetches data and renders the DrillDownSidebar
  */
 export default function DynamicSidebar({ className, isHidden, onCollapse }) {
     const [sidebarItems, setSidebarItems] = useState([]);
@@ -122,6 +122,37 @@ export default function DynamicSidebar({ className, isHidden, onCollapse }) {
         window.location.href = url;
     };
 
+    const handleCreateSubcategory = async () => {
+        if (!contextMenu.targetId) {
+            alert('Please right-click on a parent category to create a subcategory inside it.');
+            return;
+        }
+
+        const name = window.prompt(`Enter name for subcategory in "${contextMenu.targetName}":`);
+        if (!name) return;
+
+        try {
+            const response = await fetch('/api/admin/categories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    parent_id: contextMenu.targetId
+                })
+            });
+
+            if (response.ok) {
+                fetchSidebar();
+            } else {
+                const err = await response.json();
+                alert('Failed to create subcategory: ' + err.error);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error creating subcategory');
+        }
+    };
+
     if (!sidebarItems.length) return null;
 
     return (
@@ -130,7 +161,7 @@ export default function DynamicSidebar({ className, isHidden, onCollapse }) {
             onContextMenu={handleContextMenu}
             style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
         >
-            <ResponsiveSidebar
+            <DrillDownSidebar
                 sidebarItems={sidebarItems}
                 path={location.pathname}
                 isHidden={isHidden}
@@ -145,6 +176,11 @@ export default function DynamicSidebar({ className, isHidden, onCollapse }) {
                     <li className={styles.menuItem} onClick={handleCreate}>
                         ➕ New Page {contextMenu.targetName ? `on ${contextMenu.targetName}` : ''}
                     </li>
+                    {contextMenu.targetId && (
+                        <li className={styles.menuItem} onClick={handleCreateSubcategory}>
+                            📂 New Subcategory
+                        </li>
+                    )}
                 </ul>
             )}
         </div>
