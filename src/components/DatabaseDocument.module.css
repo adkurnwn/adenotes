@@ -1,0 +1,91 @@
+/* Main Container */
+.container {
+    display: flex;
+    width: 100%;
+    min-height: calc(100vh - var(--ifm-navbar-height));
+    position: relative;
+}
+
+/* Sidebar Wrapper */
+/* Sidebar Wrapper (Desktop) */
+.desktopSidebar {
+    width: var(--doc-sidebar-width, 300px);
+    flex-shrink: 0;
+    border-right: 1px solid var(--ifm-toc-border-color);
+    will-change: width;
+    transition: width 200ms ease;
+    background-color: var(--ifm-background-color);
+    height: calc(100vh - var(--ifm-navbar-height));
+    position: sticky;
+    top: var(--ifm-navbar-height);
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+}
+
+/* Sidebar Hidden State (Desktop) */
+.sidebarHidden {
+    width: var(--doc-sidebar-hidden-width, 30px);
+}
+
+/* Mobile Portal Styles */
+.mobilePortalContainer {
+    /* No z-index here, children handle it */
+}
+
+.mobileDrawer {
+    position: fixed;
+    top: var(--ifm-navbar-height);
+    left: 0;
+    height: calc(100vh - var(--ifm-navbar-height));
+    width: 80%;
+    max-width: 300px;
+    background-color: var(--ifm-navbar-background-color);
+    border-right: 1px solid var(--ifm-color-emphasis-200);
+    box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 10002;
+    display: flex;
+    flex-direction: column;
+}
+
+.mobileDrawerOpen {
+    transform: translateX(0) !important;
+}
+
+.mobileBackdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10001;
+    /* Below drawer */
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.mobileBackdropVisible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+
+/* Mobile Overlay Styles override */
+@media (max-width: 996px) {
+    .container {
+        flex-direction: column;
+    }
+
+    .desktopSidebar {
+        display: none !important;
+    }
+}
+
+/* Global override to hide standard Docusaurus mobile menu drawer */
+:global(body.custom-db-doc-active .navbar-sidebar) {
+    display: none !important;
+}

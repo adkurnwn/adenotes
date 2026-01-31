@@ -16,39 +16,33 @@ html[data-theme='dark'] {
 }
 
 .collapseSidebarButton {
-    display: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: var(--docusaurus-collapse-button-bg);
+    height: 40px;
+    position: sticky;
+    bottom: 0;
+    border-radius: 0;
+    border: 1px solid var(--ifm-toc-border-color);
+    border-left: 0;
+    border-right: 0;
+    cursor: pointer;
     margin: 0;
     width: 100%;
     color: var(--ifm-font-color-base);
 }
 
-@media (min-width: 997px) {
-    .collapseSidebarButton {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background-color: var(--docusaurus-collapse-button-bg);
-        height: 40px;
-        position: sticky;
-        bottom: 0;
-        border-radius: 0;
-        border: 1px solid var(--ifm-toc-border-color);
-        border-left: 0;
-        border-right: 0;
-        cursor: pointer;
-    }
+.collapseSidebarButtonIcon {
+    transform: rotate(180deg);
+}
 
-    .collapseSidebarButtonIcon {
-        transform: rotate(180deg);
-    }
+[dir='rtl'] .collapseSidebarButtonIcon {
+    transform: rotate(0);
+}
 
-    [dir='rtl'] .collapseSidebarButtonIcon {
-        transform: rotate(0);
-    }
-
-    .collapseSidebarButton:hover {
-        background-color: var(--docusaurus-collapse-button-bg-hover);
-    }
+.collapseSidebarButton:hover {
+    background-color: var(--docusaurus-collapse-button-bg-hover);
 }
 
 /* Collapsed State (Thin Strip) */

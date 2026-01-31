@@ -39,19 +39,14 @@ function HomepageHeader() {
         <p className="hero__subtitle">{siteConfig.tagline}</p>
         {ExecutionEnvironment.canUseDOM && (
           <p className="hero__subtitle text--secondary">
-            📊 {stats.documents} documents in database | ⚡ Real-time editing
+            📊 {stats.documents} notes
           </p>
         )}
         <div className={styles.buttons}>
           <Link
             className="button button--secondary button--lg"
             to="/intro">
-            Get Started - 5min ⏱️
-          </Link>
-          <Link
-            className="button button--outline button--lg margin-left--md"
-            to="/installation">
-            Installation Guide
+            Open Notes
           </Link>
         </div>
       </div>
@@ -63,7 +58,7 @@ export default function Home(): ReactNode {
   const {siteConfig} = useDocusaurusContext();
   return (
     <Layout
-      title={`${siteConfig.title} - Dynamic Documentation Platform`}
+      title={`${siteConfig.title}`}
       description="Database-driven documentation with real-time editing powered by Docusaurus and Cloudflare">
       <HomepageHeader />
       <main>

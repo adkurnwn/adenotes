@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from '@docusaurus/router';
-import { getSidebarStructure } from '../plugins/database-content-plugin/clientModule';
+import { getSidebarStructure, updateSidebarCache } from '../plugins/database-content-plugin/clientModule';
 import DrillDownSidebar from './DrillDownSidebar';
 import ConfirmationModal from './ConfirmationModal';
 import styles from './DynamicSidebar.module.css';
@@ -43,7 +43,9 @@ export default function DynamicSidebar({ className, isHidden, onCollapse }) {
             const response = await fetch('/api/content/sidebar');
             if (response.ok) {
                 const data = await response.json();
-                setSidebarItems(data.sidebar || []);
+                const items = data.sidebar || [];
+                setSidebarItems(items);
+                updateSidebarCache(items);
             }
         } catch (err) {
             console.error('Failed to fetch sidebar:', err);

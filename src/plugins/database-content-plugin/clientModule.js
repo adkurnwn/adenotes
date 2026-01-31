@@ -46,17 +46,24 @@ export function getContentMetadata() {
   };
 }
 
+export function updateSidebarCache(sidebar) {
+  if (!ExecutionEnvironment.canUseDOM) return;
+  if (!window.__DATABASE_CONTENT__) window.__DATABASE_CONTENT__ = {};
+
+  window.__DATABASE_CONTENT__.sidebar = sidebar;
+}
+
 /**
  * Update document in local cache (for real-time updates)
  */
 export function updateDocumentCache(slug, updatedDocument) {
   if (!ExecutionEnvironment.canUseDOM) return;
   if (!window.__DATABASE_CONTENT__?.documents) return;
-  
+
   const index = window.__DATABASE_CONTENT__.documents.findIndex(doc => doc.slug === slug);
   if (index !== -1) {
     window.__DATABASE_CONTENT__.documents[index] = updatedDocument;
-    
+
     // Trigger custom event for components to listen to
     window.dispatchEvent(new CustomEvent('databaseContentUpdated', {
       detail: { slug, document: updatedDocument }
@@ -69,12 +76,12 @@ export function updateDocumentCache(slug, updatedDocument) {
  */
 export function initializeDatabaseContent(content) {
   if (!ExecutionEnvironment.canUseDOM) return;
-  
+
   window.__DATABASE_CONTENT__ = {
     ...content,
     initialized: true,
     initializedAt: new Date().toISOString()
   };
-  
+
   console.log('📊 Database content initialized:', getContentMetadata());
 }

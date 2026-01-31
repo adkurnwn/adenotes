@@ -4,12 +4,13 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import ExecutionEnvironment from '@docusaurus/ExecutionEnvironment';
 import DynamicSidebar from './DynamicSidebar';
 import ReactMarkdown from 'react-markdown';
-import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
-import 'highlight.js/styles/github.css';
+import { updateSidebarCache } from '../plugins/database-content-plugin/clientModule';
 import DocumentEditor from './DocumentEditor';
 import ConfirmationModal from './ConfirmationModal';
+import styles from './DatabaseDocument.module.css';
+import ReactDOM from 'react-dom';
 
 /**
  * Component to render documents loaded from database
@@ -23,8 +24,39 @@ export default function DatabaseDocument(props) {
   const [error, setError] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSidebarHidden, setIsSidebarHidden] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const hasFetched = useRef(false);
+
+  useEffect(() => {
+    if (!ExecutionEnvironment.canUseDOM) return;
+    setMounted(true);
+
+    // Hijack standard Docusaurus navbar toggle
+    const handleNavbarToggle = (e) => {
+      const toggle = e.target.closest('.navbar__toggle');
+      if (toggle) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        setIsMobileSidebarOpen(prev => !prev);
+      }
+    };
+
+    const options = { capture: true, passive: false };
+    window.addEventListener('click', handleNavbarToggle, options);
+    window.addEventListener('touchstart', handleNavbarToggle, options);
+
+    setIsMobileSidebarOpen(false);
+    window.document.body.classList.add('custom-db-doc-active');
+
+    return () => {
+      window.removeEventListener('click', handleNavbarToggle, options);
+      window.removeEventListener('touchstart', handleNavbarToggle, options);
+      window.document.body.classList.remove('custom-db-doc-active');
+    };
+  }, [typeof window !== 'undefined' ? window.location.pathname : null]);
 
   useEffect(() => {
     if (!ExecutionEnvironment.canUseDOM) {
@@ -201,23 +233,13 @@ export default function DatabaseDocument(props) {
 
   return (
     <Layout title={title} description={frontmatter.description}>
-      <div style={{ display: 'flex', width: '100%', minHeight: 'calc(100vh - var(--ifm-navbar-height))' }}>
-        {/* Sidebar Column */}
-        {/* Sidebar Column */}
+      <div className={styles.container}>
+        {/* Desktop Sidebar (Hidden on Mobile) */}
         <aside
-          className="custom-sidebar-aside"
-          style={{
-            width: isSidebarHidden ? 'var(--doc-sidebar-hidden-width, 30px)' : 'var(--doc-sidebar-width, 300px)',
-            transition: 'width 200ms ease',
-            flexShrink: 0,
-            borderRight: '1px solid var(--ifm-toc-border-color)',
-            willChange: 'width',
-            display: 'block'
-          }}>
+          className={`${styles.desktopSidebar} ${isSidebarHidden ? styles.sidebarHidden : ''} custom-sidebar-aside`}
+        >
           <div style={{
-            position: 'sticky',
-            top: 'var(--ifm-navbar-height)',
-            height: 'calc(100vh - var(--ifm-navbar-height))',
+            height: '100%',
             display: 'flex',
             flexDirection: 'column',
           }}>
@@ -228,8 +250,27 @@ export default function DatabaseDocument(props) {
           </div>
         </aside>
 
+        {/* Mobile Sidebar Portal */}
+        {mounted && ReactDOM.createPortal(
+          <div className={styles.mobilePortalContainer}>
+            <div
+              className={`${styles.mobileBackdrop} ${isMobileSidebarOpen ? styles.mobileBackdropVisible : ''}`}
+              onClick={() => setIsMobileSidebarOpen(false)}
+            />
+
+            <aside className={`${styles.mobileDrawer} ${isMobileSidebarOpen ? styles.mobileDrawerOpen : ''}`}>
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <DynamicSidebar isHidden={false} />
+              </div>
+            </aside>
+          </div>,
+          window.document.body
+        )}
+
+
+
         {/* Main Content */}
-        <main style={{ flexGrow: 1, minWidth: 0 }}>
+        <main className={styles.mainContent}>
           <div className="container padding-top--md padding-bottom--lg margin-vert--lg">
             <header className="margin-bottom--lg">
               {isEditing ? (
@@ -324,12 +365,25 @@ function DatabaseMarkdown({ content }) {
       <ReactMarkdown
         children={content}
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw, rehypeHighlight]}
+        rehypePlugins={[rehypeRaw]}
         components={{
-          pre: ({ node, ...props }) => <pre className="prism-code" {...props} />,
-          code: ({ node, inline, className, children, ...props }) => (
-            <code className={className} {...props}>{children}</code>
-          )
+          pre: ({ children }) => <>{children}</>,
+          code({ node, inline, className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className || '');
+            const isMultiLine = String(children).includes('\n');
+            if (match || isMultiLine) {
+              return (
+                <CodeBlock language={match ? match[1] : undefined} className={className} {...props}>
+                  {String(children).replace(/\n$/, '')}
+                </CodeBlock>
+              );
+            }
+            return (
+              <code className={className} {...props}>
+                {children}
+              </code>
+            );
+          }
         }}
       />
     </div>
