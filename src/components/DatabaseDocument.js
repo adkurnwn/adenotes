@@ -119,22 +119,6 @@ export default function DatabaseDocument(props) {
     );
   }
 
-  // Edit Mode
-  if (isEditing) {
-    return (
-      <Layout title={`Editing ${document.title}`} noFooter>
-        <div className="container margin-vert--lg">
-          <h1>Editing: {document.title}</h1>
-          <DocumentEditor
-            initialContent={document.content}
-            onSave={handleSave}
-            onCancel={() => setIsEditing(false)}
-          />
-        </div>
-      </Layout>
-    );
-  }
-
   // View Mode
   const frontmatter = document.frontmatter || {};
   const title = document.title || frontmatter.title || 'Untitled';
@@ -143,21 +127,23 @@ export default function DatabaseDocument(props) {
     <Layout title={title} description={frontmatter.description}>
       <div style={{ display: 'flex', width: '100%', minHeight: 'calc(100vh - var(--ifm-navbar-height))' }}>
         {/* Sidebar Column */}
-        <aside style={{
-          width: isSidebarHidden ? '30px' : 'var(--doc-sidebar-width, 300px)',
-          transition: 'width 200ms ease',
-          flexShrink: 0,
-          borderRight: '1px solid var(--ifm-toc-border-color)',
-          willChange: 'width',
-          display: 'block'
-        }}>
+        {/* Sidebar Column */}
+        <aside
+          className="custom-sidebar-aside"
+          style={{
+            width: isSidebarHidden ? 'var(--doc-sidebar-hidden-width, 30px)' : 'var(--doc-sidebar-width, 300px)',
+            transition: 'width 200ms ease',
+            flexShrink: 0,
+            borderRight: '1px solid var(--ifm-toc-border-color)',
+            willChange: 'width',
+            display: 'block'
+          }}>
           <div style={{
             position: 'sticky',
             top: 'var(--ifm-navbar-height)',
             height: 'calc(100vh - var(--ifm-navbar-height))',
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden'
           }}>
             <DynamicSidebar
               isHidden={isSidebarHidden}
@@ -176,18 +162,28 @@ export default function DatabaseDocument(props) {
               )}
             </header>
 
-            <article className="database-document__content markdown">
-              <DatabaseMarkdown content={document.content} />
-            </article>
+            {isEditing ? (
+              <DocumentEditor
+                initialContent={document.content}
+                onSave={handleSave}
+                onCancel={() => setIsEditing(false)}
+              />
+            ) : (
+              <>
+                <article className="database-document__content markdown">
+                  <DatabaseMarkdown content={document.content} />
+                </article>
 
-            <div className="database-document__actions margin-top--lg">
-              <button
-                className="button button--secondary button--sm"
-                onClick={() => setIsEditing(true)}
-              >
-                ✏️ Edit
-              </button>
-            </div>
+                <div className="database-document__actions margin-top--lg">
+                  <button
+                    className="button button--secondary button--sm"
+                    onClick={() => setIsEditing(true)}
+                  >
+                    ✏️ Edit
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </main>
       </div>

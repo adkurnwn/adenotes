@@ -28,3 +28,103 @@
   --ifm-color-primary-lightest: #4fddbf;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
 }
+
+/* Custom Sidebar Logic */
+@media (max-width: 996px) {
+  .custom-sidebar-aside {
+    display: none !important;
+  }
+}
+
+/* Ensure Sidebar fills height to push expand button to bottom */
+.theme-doc-sidebar-container {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}
+
+/* Target the Docusaurus internal sidebar container */
+div[class*="sidebar_"] {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.theme-doc-sidebar-menu {
+  flex-grow: 1 !important;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+/* Button styles for when Sidebar is OPEN (sticky bottom) */
+button[class*="collapseSidebarButton"] {
+  position: sticky !important;
+  bottom: 0 !important;
+  display: flex !important;
+  justify-content: center;
+  z-index: 100 !important;
+  margin-top: auto;
+  width: 100% !important;
+  padding: 8px !important;
+  border-radius: 0 !important;
+  border: none !important;
+  border-top: 1px solid var(--ifm-toc-border-color) !important;
+  background-color: var(--ifm-background-surface-color) !important;
+  cursor: pointer;
+}
+
+/* FIX: Override Docusaurus hiding the sidebar completely when collapsed */
+div[class*="sidebarHidden"] {
+  opacity: 1 !important;
+  visibility: visible !important;
+  width: 100% !important;
+  cursor: pointer;
+  background-color: var(--ifm-background-surface-color);
+  border-right: 1px solid var(--ifm-toc-border-color);
+  position: relative !important;
+  /* Context for absolute positioning */
+}
+
+/* Hide everything except the button when collapsed */
+div[class*="sidebarHidden"]>*:not(button[class*="collapseSidebarButton"]) {
+  display: none !important;
+}
+
+/* 
+   Button styles for when Sidebar is COLLAPSED (hidden state)
+   User Request: Full height clickable area, icon centered.
+*/
+div[class*="sidebarHidden"] button[class*="collapseSidebarButton"] {
+  display: flex !important;
+  width: 100% !important;
+  height: 100% !important;
+  /* Full height clickable */
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  transform: none !important;
+  justify-content: center;
+  align-items: center;
+  /* Vertically center the icon */
+  background: transparent !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Ensure arrow is visible and rotated */
+div[class*="sidebarHidden"] button[class*="collapseSidebarButton"] svg {
+  transform: rotate(180deg) !important;
+  width: 20px;
+  height: 20px;
+  color: var(--ifm-color-content-secondary);
+}
+
+/* Hover effect */
+div[class*="sidebarHidden"] button[class*="collapseSidebarButton"]:hover {
+  background-color: var(--ifm-color-emphasis-200) !important;
+  color: var(--ifm-color-primary);
+}

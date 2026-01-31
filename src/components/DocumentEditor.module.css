@@ -21,10 +21,33 @@
   padding: 1rem;
 }
 
-/* Override MDXEditor styles to match Docusaurus */
+/* Force CSS variable inheritance for MDXEditor to match Docusaurus */
 :global(.mdx-editor) {
   font-family: var(--ifm-font-family-base);
   color: var(--ifm-font-color-base);
+  background-color: var(--ifm-background-surface-color);
+  min-height: 500px;
+
+  /* Fallback vars just in case */
+  --mdx-editor-font-family: var(--ifm-font-family-base);
+  --mdx-editor-color: var(--ifm-font-color-base);
+  --mdx-editor-bg-color: var(--ifm-background-surface-color);
+}
+
+/* Ensure content editable area inherits colors */
+:global(.mdx-editor .mdx-editor-content),
+:global(.mdx-editor [contenteditable]) {
+  color: var(--ifm-font-color-base) !important;
+  caret-color: var(--ifm-font-color-base);
+  min-height: 500px;
+  outline: none;
+  max-width: 100%;
+  padding: 1rem;
+}
+
+/* Fix paragraph margins if needed */
+:global(.mdx-editor p) {
+  margin-bottom: var(--ifm-paragraph-margin-bottom);
 }
 
 :global(.mdx-editor .prose) {

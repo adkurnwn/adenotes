@@ -14,7 +14,8 @@
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
     "typecheck": "tsc",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "db:migrate": "wrangler d1 migrations apply note-ade-db --local"
   },
   "dependencies": {
     "@docusaurus/core": "3.9.2",

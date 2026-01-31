@@ -3,6 +3,8 @@ import { MDXEditor, headingsPlugin, quotePlugin, listsPlugin, thematicBreakPlugi
 import '@mdxeditor/editor/style.css';
 import styles from './DocumentEditor.module.css';
 
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
 /**
  * Editor component using @mdxeditor/editor
  */
@@ -27,18 +29,23 @@ export default function DocumentEditor({ initialContent, onSave, onCancel }) {
                 <button onClick={onCancel} className="button button--secondary">Cancel</button>
             </div>
             <div className={styles.editorContainer}>
-                <MDXEditor
-                    markdown={content}
-                    onChange={setContent}
-                    plugins={[
-                        headingsPlugin(),
-                        quotePlugin(),
-                        listsPlugin(),
-                        thematicBreakPlugin(),
-                        markdownShortcutPlugin()
-                    ]}
-                    contentEditableClassName="prose max-w-none"
-                />
+                <BrowserOnly fallback={<div>Loading Editor...</div>}>
+                    {() => (
+                        <MDXEditor
+                            key={initialContent ? 'loaded' : 'loading'}
+                            markdown={content || ''}
+                            onChange={setContent}
+                            plugins={[
+                                headingsPlugin(),
+                                listsPlugin(),
+                                quotePlugin(),
+                                thematicBreakPlugin(),
+                                markdownShortcutPlugin()
+                            ]}
+                            contentEditableClassName="mdx-editor-content"
+                        />
+                    )}
+                </BrowserOnly>
             </div>
         </div>
     );

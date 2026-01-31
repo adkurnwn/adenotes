@@ -6,7 +6,7 @@ const contentRoutes = new Hono()
 contentRoutes.get('/sidebar', async (c) => {
   try {
     const db = c.env.note_ade_db
-    
+
     // Get categories with their documents
     const categories = await db.prepare(`
       SELECT c.*, d.id as doc_id, d.title as doc_title, d.slug as doc_slug
@@ -14,10 +14,27 @@ contentRoutes.get('/sidebar', async (c) => {
       LEFT JOIN documents d ON c.id = d.category_id AND d.is_published = 1
       ORDER BY c.sidebar_position, d.sidebar_position
     `).all()
-    
+
+    // Build hierarchical structure
     // Build hierarchical structure
     const sidebarStructure = buildSidebarHierarchy(categories.results || [])
-    
+
+    // Get uncategorized documents
+    const uncategorized = await db.prepare(`
+      SELECT id, title, slug 
+      FROM documents 
+      WHERE category_id IS NULL AND is_published = 1
+      ORDER BY updated_at DESC
+    `).all()
+
+    if (uncategorized.results && uncategorized.results.length > 0) {
+      sidebarStructure.push(...uncategorized.results.map(doc => ({
+        type: 'doc',
+        id: doc.slug,
+        label: doc.title
+      })))
+    }
+
     return c.json({ sidebar: sidebarStructure })
   } catch (error) {
     return c.json({ error: 'Failed to generate sidebar' }, 500)
@@ -29,23 +46,24 @@ contentRoutes.get('/documents/:slug', async (c) => {
   try {
     const slug = c.req.param('slug')
     const db = c.env.note_ade_db
-    
+
     const document = await db.prepare(`
       SELECT d.*, c.name as category_name, c.slug as category_slug
       FROM documents d
       LEFT JOIN categories c ON d.category_id = c.id
       WHERE d.slug = ? AND d.is_published = 1
     `).bind(slug).first()
-    
+
     if (!document) {
       return c.json({ error: 'Document not found' }, 404)
     }
-    
+
     // Parse frontmatter
     const frontmatter = document.frontmatter ? JSON.parse(document.frontmatter) : {}
-    
+
     return c.json({
       id: document.id,
+      category_id: document.category_id,
       title: document.title,
       slug: document.slug,
       content: document.content,
@@ -65,7 +83,7 @@ contentRoutes.get('/documents/:slug', async (c) => {
 contentRoutes.get('/manifest', async (c) => {
   try {
     const db = c.env.note_ade_db
-    
+
     const documents = await db.prepare(`
       SELECT d.slug, d.title, d.updated_at, c.slug as category_slug
       FROM documents d
@@ -73,7 +91,7 @@ contentRoutes.get('/manifest', async (c) => {
       WHERE d.is_published = 1
       ORDER BY d.updated_at DESC
     `).all()
-    
+
     return c.json({
       documents: documents.results || [],
       generated_at: new Date().toISOString()
@@ -87,14 +105,14 @@ contentRoutes.get('/manifest', async (c) => {
 contentRoutes.get('/search-index', async (c) => {
   try {
     const db = c.env.note_ade_db
-    
+
     const documents = await db.prepare(`
       SELECT d.title, d.slug, d.content, d.frontmatter, c.name as category_name
       FROM documents d
       LEFT JOIN categories c ON d.category_id = c.id
       WHERE d.is_published = 1
     `).all()
-    
+
     const searchIndex = (documents.results || []).map(doc => {
       const frontmatter = doc.frontmatter ? JSON.parse(doc.frontmatter) : {}
       return {
@@ -106,7 +124,7 @@ contentRoutes.get('/search-index', async (c) => {
         keywords: frontmatter.keywords || []
       }
     })
-    
+
     return c.json({ index: searchIndex })
   } catch (error) {
     return c.json({ error: 'Failed to generate search index' }, 500)
@@ -117,7 +135,7 @@ contentRoutes.get('/search-index', async (c) => {
 function buildSidebarHierarchy(categories) {
   const categoryMap = new Map()
   const rootCategories = []
-  
+
   // First pass: create category entries
   categories.forEach(row => {
     if (!categoryMap.has(row.id)) {
@@ -129,7 +147,7 @@ function buildSidebarHierarchy(categories) {
         items: []
       })
     }
-    
+
     // Add document to category if it exists
     if (row.doc_id) {
       categoryMap.get(row.id).items.push({
@@ -139,7 +157,7 @@ function buildSidebarHierarchy(categories) {
       })
     }
   })
-  
+
   // Second pass: build hierarchy
   categories.forEach(row => {
     const category = categoryMap.get(row.id)
@@ -149,7 +167,7 @@ function buildSidebarHierarchy(categories) {
       rootCategories.push(category)
     }
   })
-  
+
   return rootCategories
 }
 

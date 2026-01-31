@@ -39,3 +39,30 @@ GIT_USER=<Your GitHub username> yarn deploy
 ```
 
 If you are using GitHub pages for hosting, this command is a convenient way to build the website and push to the `gh-pages` branch.
+
+## Database Management (Cloudflare D1)
+
+This project uses Cloudflare D1 for dynamic content.
+
+### Apply Migrations
+
+To set up the database schema:
+
+```bash
+npm run db:migrate
+# OR
+npx wrangler d1 migrations apply note-ade-db --local
+```
+
+### Reset Database
+
+To completely clear the local database and redo migrations:
+
+1. Stop the running server.
+2. Delete the local state directory:
+   - **Windows**: Delete `.wrangler\state` folder
+   - **Mac/Linux**: `rm -rf .wrangler/state`
+3. Re-apply migrations:
+   ```bash
+   npm run db:migrate
+   ```

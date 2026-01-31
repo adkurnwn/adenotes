@@ -77,7 +77,8 @@ adminRoutes.post('/documents', async (c) => {
     const db = c.env.note_ade_db
     const body = await c.req.json()
 
-    const { title, slug, content, frontmatter, category_id, is_draft = true } = body
+    // Default values if undefined
+    const { title, slug, content, frontmatter, category_id, is_draft } = body
 
     // Check if slug already exists
     const existing = await db.prepare('SELECT id FROM documents WHERE slug = ?').bind(slug).first()
@@ -87,10 +88,16 @@ adminRoutes.post('/documents', async (c) => {
 
     const frontmatterJson = frontmatter ? JSON.stringify(frontmatter) : null
 
+    // Sanitise inputs for D1
+    const bindCategoryId = category_id === undefined ? null : category_id
+    // Default is_draft to true for new docs if undefined
+    const bindIsDraft = is_draft === undefined || is_draft === true ? 1 : 0
+    const bindIsPublished = bindIsDraft ? 0 : 1
+
     const result = await db.prepare(`
       INSERT INTO documents (title, slug, content, frontmatter, category_id, is_draft, is_published)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(title, slug, content, frontmatterJson, category_id, is_draft, !is_draft).run()
+    `).bind(title, slug, content, frontmatterJson, bindCategoryId, bindIsDraft, bindIsPublished).run()
 
     // Create initial version
     await db.prepare(`
@@ -124,6 +131,15 @@ adminRoutes.put('/documents/:id', async (c) => {
 
     const frontmatterJson = frontmatter ? JSON.stringify(frontmatter) : null
 
+    // Sanitise inputs for D1
+    const bindCategoryId = category_id === undefined ? null : category_id
+
+    // For update, careful about is_draft undefined.
+    // Assuming UI always sends current state. If undefined, default to 0 (published) or 1?
+    // Let's assume passed value is truthy/falsy.
+    const bindIsDraft = is_draft ? 1 : 0
+    const bindIsPublished = bindIsDraft ? 0 : 1
+
     // Get current version number
     const currentVersion = await db.prepare('SELECT MAX(version_number) as max_version FROM document_versions WHERE document_id = ?').bind(id).first()
     const newVersionNumber = (currentVersion?.max_version || 0) + 1
@@ -134,7 +150,7 @@ adminRoutes.put('/documents/:id', async (c) => {
       SET title = ?, slug = ?, content = ?, frontmatter = ?, category_id = ?, 
           is_draft = ?, is_published = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).bind(title, slug, content, frontmatterJson, category_id, is_draft, !is_draft, id).run()
+    `).bind(title, slug, content, frontmatterJson, bindCategoryId, bindIsDraft, bindIsPublished, id).run()
 
     // Create new version
     await db.prepare(`

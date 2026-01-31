@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useLocation } from '@docusaurus/router';
 import { getSidebarStructure } from '../plugins/database-content-plugin/clientModule';
 import ResponsiveSidebar from './ResponsiveSidebar';
+import styles from './DynamicSidebar.module.css';
 
 /**
  * Container component that fetches data and renders the ResponsiveSidebar
  */
 export default function DynamicSidebar({ className, isHidden, onCollapse }) {
     const [sidebarItems, setSidebarItems] = useState([]);
+    const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
     const location = useLocation();
 
     useEffect(() => {
@@ -22,6 +24,14 @@ export default function DynamicSidebar({ className, isHidden, onCollapse }) {
         }
     }, []);
 
+    useEffect(() => {
+        const handleClick = () => {
+            if (contextMenu.visible) setContextMenu({ ...contextMenu, visible: false });
+        };
+        window.addEventListener('click', handleClick);
+        return () => window.removeEventListener('click', handleClick);
+    }, [contextMenu]);
+
     const fetchSidebar = async () => {
         try {
             const response = await fetch('/api/content/sidebar');
@@ -32,6 +42,15 @@ export default function DynamicSidebar({ className, isHidden, onCollapse }) {
         } catch (err) {
             console.error('Failed to fetch sidebar:', err);
         }
+    };
+
+    const handleContextMenu = (e) => {
+        e.preventDefault();
+        setContextMenu({
+            visible: true,
+            x: e.clientX,
+            y: e.clientY
+        });
     };
 
     const handleCreate = async () => {
@@ -65,23 +84,28 @@ export default function DynamicSidebar({ className, isHidden, onCollapse }) {
     if (!sidebarItems.length) return null;
 
     return (
-        <div className={className}>
-            {!isHidden && (
-                <div className="padding-horiz--md margin-vert--sm">
-                    <button
-                        className="button button--primary button--block button--sm"
-                        onClick={handleCreate}
-                    >
-                        + New Page
-                    </button>
-                </div>
-            )}
+        <div
+            className={className}
+            onContextMenu={handleContextMenu}
+            style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+        >
             <ResponsiveSidebar
                 sidebarItems={sidebarItems}
                 path={location.pathname}
                 isHidden={isHidden}
                 onCollapse={onCollapse}
             />
+
+            {contextMenu.visible && (
+                <ul
+                    className={styles.contextMenu}
+                    style={{ top: contextMenu.y, left: contextMenu.x }}
+                >
+                    <li className={styles.menuItem} onClick={handleCreate}>
+                        ➕ New Page
+                    </li>
+                </ul>
+            )}
         </div>
     );
 }
