@@ -84,7 +84,15 @@ async function contentDidLoad({ content, actions, allContent, options }) {
       });
     }
 
-    console.log(`✅ Created ${fallbackDocuments.length} fallback routes`);
+    // Explicit route for creating new documents
+    addRoute({
+      path: '/new',
+      component: '@site/src/components/DatabaseDocument',
+      exact: true,
+      modules: {},
+    });
+
+    console.log(`✅ Created ${fallbackDocuments.length} fallback routes + /new route`);
     return;
   }
 

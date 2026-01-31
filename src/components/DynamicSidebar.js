@@ -9,7 +9,13 @@ import styles from './DynamicSidebar.module.css';
  */
 export default function DynamicSidebar({ className, isHidden, onCollapse }) {
     const [sidebarItems, setSidebarItems] = useState([]);
-    const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
+    const [contextMenu, setContextMenu] = useState({
+        visible: false,
+        x: 0,
+        y: 0,
+        targetId: null,
+        targetName: null
+    });
     const location = useLocation();
 
     useEffect(() => {
@@ -44,41 +50,76 @@ export default function DynamicSidebar({ className, isHidden, onCollapse }) {
         }
     };
 
+    const findCategoryByLabel = (items, label) => {
+        for (const item of items) {
+            if (item.type === 'category') {
+                // Check exact match or if label is contained (handling icons etc)
+                if (item.label === label || label.includes(item.label)) return item;
+                const childResult = findCategoryByLabel(item.items, label);
+                if (childResult) return childResult;
+            }
+        }
+        return null;
+    };
+
     const handleContextMenu = (e) => {
         e.preventDefault();
+
+        let targetId = null;
+        let targetName = null;
+
+        // Try to identify clicked element
+        // Look for the clicked element text
+        const targetText = e.target.innerText?.trim();
+
+        if (targetText) {
+            const cat = findCategoryByLabel(sidebarItems, targetText);
+            if (cat) {
+                targetId = cat.customProps?.categoryId;
+                targetName = cat.label;
+            }
+        }
+
         setContextMenu({
             visible: true,
             x: e.clientX,
-            y: e.clientY
+            y: e.clientY,
+            targetId,
+            targetName
         });
     };
 
-    const handleCreate = async () => {
-        const title = window.prompt('Enter page title:');
-        if (!title) return;
+    const findCurrentCategory = (items, currentPath) => {
+        const path = currentPath.replace(/^\//, '');
 
-        const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        for (const item of items) {
+            if (item.type === 'category') {
+                const hasActiveChild = item.items.some(child =>
+                    child.id === path ||
+                    currentPath.endsWith(child.id) ||
+                    (child.href && child.href.endsWith(path))
+                );
 
-        try {
-            const response = await fetch('/api/admin/documents', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title,
-                    slug,
-                    content: `# ${title}\n\nNew content here.`
-                })
-            });
+                if (hasActiveChild) {
+                    return item.customProps?.categoryId;
+                }
 
-            if (response.ok) {
-                window.location.href = `/${slug}`;
-            } else {
-                alert('Failed to create page');
+                const childResult = findCurrentCategory(item.items, currentPath);
+                if (childResult) return childResult;
             }
-        } catch (err) {
-            console.error(err);
-            alert('Error creating page');
         }
+        return null;
+    };
+
+    const handleCreate = () => {
+        // Use ID from context menu if available, else fallback to current path detection
+        const currentPath = location.pathname;
+        const fallbackId = findCurrentCategory(sidebarItems, currentPath);
+
+        const categoryId = contextMenu.targetId || fallbackId;
+
+        const url = `/new${categoryId ? `?categoryId=${categoryId}` : ''}`;
+        window.location.href = url;
     };
 
     if (!sidebarItems.length) return null;
@@ -102,7 +143,7 @@ export default function DynamicSidebar({ className, isHidden, onCollapse }) {
                     style={{ top: contextMenu.y, left: contextMenu.x }}
                 >
                     <li className={styles.menuItem} onClick={handleCreate}>
-                        ➕ New Page
+                        ➕ New Page {contextMenu.targetName ? `on ${contextMenu.targetName}` : ''}
                     </li>
                 </ul>
             )}

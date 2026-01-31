@@ -144,6 +144,7 @@ function buildSidebarHierarchy(categories) {
         label: row.name,
         collapsible: row.is_collapsible,
         collapsed: row.is_collapsed,
+        customProps: { categoryId: row.id },
         items: []
       })
     }

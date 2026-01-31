@@ -105,7 +105,15 @@ adminRoutes.post('/documents', async (c) => {
       VALUES (?, ?, ?, ?, 1)
     `).bind(result.meta.last_row_id, title, content, frontmatterJson).run()
 
-    return c.json({ id: result.meta.last_row_id, message: 'Document created successfully' })
+    // Fetch the created document with category slug for redirection
+    const createdDoc = await db.prepare(`
+      SELECT d.*, c.slug as category_slug
+      FROM documents d
+      LEFT JOIN categories c ON d.category_id = c.id
+      WHERE d.id = ?
+    `).bind(result.meta.last_row_id).first()
+
+    return c.json(createdDoc)
   } catch (error) {
     console.error('Failed to create document:', error);
     return c.json({ error: 'Failed to create document: ' + error.message }, 500)

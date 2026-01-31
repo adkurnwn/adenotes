@@ -16,6 +16,7 @@ import DocumentEditor from './DocumentEditor';
  */
 export default function DatabaseDocument(props) {
   const { siteConfig } = useDocusaurusContext();
+  const { documentData, NotFoundComponent } = props;
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -23,11 +24,28 @@ export default function DatabaseDocument(props) {
   const [isSidebarHidden, setIsSidebarHidden] = useState(false);
   const hasFetched = useRef(false);
 
-  const documentData = props.documentData;
-
   useEffect(() => {
     if (!ExecutionEnvironment.canUseDOM) {
       setLoading(false);
+      return;
+    }
+
+    // Handle New Document Mode
+    // Check path robustly (handling trailing slash)
+    const normalizedPath = window.location.pathname.replace(/\/$/, '');
+
+    if (normalizedPath === '/new') {
+      const params = new URLSearchParams(window.location.search);
+      setDocument({
+        id: null,
+        title: 'New Page',
+        slug: 'new-page', // Placeholder
+        content: '# New Page\n\nStart writing...',
+        category_id: params.get('categoryId') || null
+      });
+      setIsEditing(true);
+      setLoading(false);
+      hasFetched.current = true; // Prevent further fetching
       return;
     }
 
@@ -39,10 +57,9 @@ export default function DatabaseDocument(props) {
 
     if (!hasFetched.current) {
       hasFetched.current = true;
-      const currentPath = window.location.pathname;
-      // Extract the last segment as the slug, handling trailing slashes
-      const docSlug = currentPath.replace(/\/$/, '').split('/').pop();
-      if (docSlug) {
+      const docSlug = normalizedPath.split('/').pop();
+      // Ensure we don't try to fetch 'new' as a document if something clipped above
+      if (docSlug && docSlug !== 'new') {
         fetchDocumentBySlug(docSlug);
       }
     }
@@ -67,25 +84,55 @@ export default function DatabaseDocument(props) {
     }
   };
 
+  const handleTitleChange = (e) => {
+    const newTitle = e.target.value;
+    const isNew = !document.id;
+
+    setDocument(prev => ({
+      ...prev,
+      title: newTitle,
+      // Only auto-update slug for new documents
+      slug: isNew ? newTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : prev.slug
+    }));
+  };
+
   const handleSave = async (newContent) => {
-    if (!document) return;
-
     try {
-      console.log('Saving content for', document.id, newContent.substring(0, 50) + '...');
+      console.log('Saving content...');
 
-      const response = await fetch(`/api/admin/documents/${document.id}`, {
-        method: 'PUT',
+      const isNew = !document.id;
+      const method = isNew ? 'POST' : 'PUT';
+      const url = isNew ? '/api/admin/documents' : `/api/admin/documents/${document.id}`;
+
+      // Payload uses current state (title/slug) + new content
+      // Explicitly publish the document (is_draft: 0) to make it viewable via public API
+      let payload = { ...document, content: newContent, is_draft: 0 };
+
+      const response = await fetch(url, {
+        method: method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...document, content: newContent })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update document');
+        throw new Error('Failed to save document');
       }
 
-      setDocument({ ...document, content: newContent });
-      setIsEditing(false);
-      alert('Document saved successfully!');
+      const savedDoc = await response.json();
+
+      if (isNew) {
+        alert('Document created!');
+        // Redirect to the new document URL
+        const newPath = savedDoc.category_slug
+          ? `/${savedDoc.category_slug}/${savedDoc.slug}`
+          : `/${savedDoc.slug}`;
+        window.location.href = newPath;
+      } else {
+        setDocument({ ...document, content: newContent });
+        setIsEditing(false);
+        alert('Document saved successfully!');
+      }
+
     } catch (err) {
       console.error('Save error:', err);
       alert('Error saving document: ' + err.message);
@@ -100,6 +147,14 @@ export default function DatabaseDocument(props) {
   if (loading) return <LoadingLayout />;
 
   if (error) {
+    if (NotFoundComponent) {
+      return (
+        <Layout>
+          <NotFoundComponent />
+        </Layout>
+      );
+    }
+
     return (
       <Layout title="Document Not Found">
         <main className="container margin-vert--lg">
@@ -160,7 +215,34 @@ export default function DatabaseDocument(props) {
         <main style={{ flexGrow: 1, minWidth: 0 }}>
           <div className="container padding-top--md padding-bottom--lg margin-vert--lg">
             <header className="margin-bottom--lg">
-              <h1 className="database-document__title">{title}</h1>
+              {isEditing ? (
+                <div className="margin-bottom--md">
+                  <input
+                    type="text"
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      fontSize: '2rem',
+                      fontWeight: 'bold',
+                      border: '1px solid var(--ifm-color-emphasis-300)',
+                      borderRadius: '8px',
+                      marginBottom: '0.5rem',
+                      backgroundColor: 'var(--ifm-background-color)',
+                      color: 'var(--ifm-font-color-base)'
+                    }}
+                    value={document.title}
+                    onChange={handleTitleChange}
+                    placeholder="Enter Page Title"
+                  />
+                  {(!document.id) && (
+                    <div style={{ fontSize: '0.8em', color: 'var(--ifm-color-content-secondary)' }}>
+                      Slug: {document.slug}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <h1 className="database-document__title">{title}</h1>
+              )}
               {document.category_name && (
                 <div className="database-document__category">📁 {document.category_name}</div>
               )}
