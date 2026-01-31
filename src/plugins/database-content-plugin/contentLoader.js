@@ -11,39 +11,39 @@ const getApiUrl = (options) => {
  */
 async function loadContent(options = {}) {
   const apiUrl = getApiUrl(options);
-  
+
   try {
     console.log('🔄 Loading content from database...');
-    
+
     // Fetch all documents and sidebar structure
     const [documentsRes, sidebarRes, manifestRes] = await Promise.all([
       fetch(`${apiUrl}/admin/documents`),
       fetch(`${apiUrl}/content/sidebar`),
       fetch(`${apiUrl}/content/manifest`)
     ]);
-    
+
     if (!documentsRes.ok || !sidebarRes.ok || !manifestRes.ok) {
       throw new Error(`API request failed: ${documentsRes.status}`);
     }
-    
+
     const [documentsData, sidebarData, manifestData] = await Promise.all([
       documentsRes.json(),
       sidebarRes.json(),
       manifestRes.json()
     ]);
-    
+
     console.log(`✅ Loaded ${documentsData.documents?.length || 0} documents from database`);
-    
+
     return {
       documents: documentsData.documents || [],
       sidebar: sidebarData.sidebar || [],
       manifest: manifestData,
       loadedAt: new Date().toISOString()
     };
-    
+
   } catch (error) {
     console.error('❌ Failed to load content from database:', error.message);
-    
+
     // Return fallback content in case of API failure
     return {
       documents: [],
@@ -60,47 +60,50 @@ async function loadContent(options = {}) {
  */
 async function contentDidLoad({ content, actions, allContent, options }) {
   const { createData, addRoute } = actions;
-  
+
   if (!content.documents || content.documents.length === 0) {
     console.warn('⚠️ No documents loaded from database');
-    
+
     // Create fallback routes for expected documents when API is unavailable
+    // MATCH SEED DATA STRUCTURE
     const fallbackDocuments = [
-      { slug: 'intro', title: 'Introduction' },
-      { slug: 'installation', title: 'Installation' },
-      { slug: 'getting-started', title: 'Getting Started' }
+      { slug: 'intro', title: 'Introduction', category: 'getting-started' },
+      { slug: 'installation', title: 'Installation', category: 'getting-started' },
+      { slug: 'create-document', title: 'Create a Document', category: 'tutorial-basics' }
     ];
-    
+
     console.log('🔄 Creating fallback routes for dynamic content loading...');
-    
+
     for (const doc of fallbackDocuments) {
+      const docPath = doc.category ? `/${doc.category}/${doc.slug}` : `/${doc.slug}`;
       addRoute({
-        path: `/${doc.slug}`,
+        path: docPath,
         component: '@site/src/components/DatabaseDocument',
         exact: true,
         modules: {},
       });
     }
-    
+
     console.log(`✅ Created ${fallbackDocuments.length} fallback routes`);
     return;
   }
-  
+
   console.log('🔨 Processing database content for Docusaurus...');
-  
+
   // Create data files for client-side access
   await createData('database-content.json', JSON.stringify({
     documents: content.documents,
     sidebar: content.sidebar,
     loadedAt: content.loadedAt
   }));
-  
+
   // Create routes for each document
   for (const document of content.documents) {
     if (!document.is_published) continue;
-    
-    const routePath = `/${document.slug}`;
-    
+
+    const categoryPrefix = document.category_slug ? `/${document.category_slug}` : '';
+    const routePath = `${categoryPrefix}/${document.slug}`;
+
     // Create individual document data file
     const documentData = {
       id: document.id,
@@ -115,12 +118,12 @@ async function contentDidLoad({ content, actions, allContent, options }) {
         loadedAt: content.loadedAt
       }
     };
-    
+
     const documentDataPath = await createData(
       `document-${document.slug}.json`,
       JSON.stringify(documentData)
     );
-    
+
     // Add route for the document
     addRoute({
       path: routePath,
@@ -131,7 +134,7 @@ async function contentDidLoad({ content, actions, allContent, options }) {
       },
     });
   }
-  
+
   console.log(`✅ Created ${content.documents.filter(d => d.is_published).length} document routes`);
 }
 

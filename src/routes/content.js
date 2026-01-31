@@ -150,9 +150,10 @@ function buildSidebarHierarchy(categories) {
 
     // Add document to category if it exists
     if (row.doc_id) {
+      const docPath = row.slug ? `${row.slug}/${row.doc_slug}` : row.doc_slug
       categoryMap.get(row.id).items.push({
         type: 'doc',
-        id: row.doc_slug,
+        id: docPath,
         label: row.doc_title
       })
     }

@@ -9,7 +9,7 @@ adminRoutes.get('/documents', async (c) => {
     const { category, status, search } = c.req.query()
 
     let query = `
-      SELECT d.*, c.name as category_name
+      SELECT d.*, c.name as category_name, c.slug as category_slug
       FROM documents d
       LEFT JOIN categories c ON d.category_id = c.id
       WHERE 1=1

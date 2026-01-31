@@ -39,8 +39,12 @@ export default function DatabaseDocument(props) {
 
     if (!hasFetched.current) {
       hasFetched.current = true;
-      const currentPath = window.location.pathname.replace(/^\/|\/$/g, '');
-      fetchDocumentBySlug(currentPath);
+      const currentPath = window.location.pathname;
+      // Extract the last segment as the slug, handling trailing slashes
+      const docSlug = currentPath.replace(/\/$/, '').split('/').pop();
+      if (docSlug) {
+        fetchDocumentBySlug(docSlug);
+      }
     }
   }, []);
 
