@@ -1,0 +1,32 @@
+.editorWrapper {
+  display: flex;
+  flex-direction: column;
+  height: 80vh;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-global-radius);
+  background-color: var(--ifm-background-surface-color);
+}
+
+.toolbar {
+  padding: 1rem;
+  border-bottom: 1px solid var(--ifm-color-emphasis-300);
+  background-color: var(--ifm-background-color);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.editorContainer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+/* Override MDXEditor styles to match Docusaurus */
+:global(.mdx-editor) {
+  font-family: var(--ifm-font-family-base);
+  color: var(--ifm-font-color-base);
+}
+
+:global(.mdx-editor .prose) {
+  max-width: 100% !important;
+}

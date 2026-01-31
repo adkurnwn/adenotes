@@ -1,5 +1,5 @@
-import {themes as prismThemes} from 'prism-react-renderer';
-import type {Config} from '@docusaurus/types';
+import { themes as prismThemes } from 'prism-react-renderer';
+import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
@@ -48,8 +48,8 @@ const config: Config = {
     [
       './src/plugins/database-content-plugin',
       {
-        apiUrl: process.env.API_URL || 
-          (process.env.NODE_ENV === 'production' 
+        apiUrl: process.env.API_URL ||
+          (process.env.NODE_ENV === 'production'
             ? 'https://notes.adekurniawan.me'
             : 'http://127.0.0.1:8787/api'),
         contentPath: 'database', // Virtual content path
@@ -64,12 +64,18 @@ const config: Config = {
     colorMode: {
       respectPrefersColorScheme: true,
     },
+    docs: {
+      sidebar: {
+        hideable: true,
+      },
+    },
     navbar: {
       title: 'Note-ADE',
       logo: {
         alt: 'Note-ADE Logo',
         src: 'img/logo.svg',
       },
+
       items: [
         {
           href: 'https://github.com/note-ade/note-ade',
