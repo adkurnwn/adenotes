@@ -74,16 +74,20 @@ export default function DatabaseDocument(props) {
 
     const handleRoute = () => {
       const hash = window.location.hash;
-      const normalizedPath = hash.replace(/^#\/?/, '').replace(/\/$/, '');
+      // Split hash into path and query parts (e.g. "#/new?categoryId=2" → path="new", query="categoryId=2")
+      const hashWithoutPrefix = hash.replace(/^#\/?/, '');
+      const [hashPath, hashQuery] = hashWithoutPrefix.split('?');
+      const normalizedPath = hashPath.replace(/\/$/, '');
 
       if (normalizedPath === 'new') {
-        const params = new URLSearchParams(window.location.search);
+        // Query params live inside the hash, not in window.location.search
+        const params = new URLSearchParams(hashQuery || '');
         setDocument({
           id: null,
           title: 'New Page',
           slug: 'new-page', // Placeholder
           content: '# New Page\n\nStart writing...',
-          category_id: params.get('categoryId') || null
+          category_id: params.get('categoryId') ? Number(params.get('categoryId')) : null
         });
         setIsEditing(true);
         setLoading(false);

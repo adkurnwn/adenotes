@@ -109,7 +109,14 @@ adminRoutes.post('/documents', async (c) => {
     const frontmatterJson = frontmatter ? JSON.stringify(frontmatter) : null
 
     // Sanitise inputs for D1
-    const bindCategoryId = category_id === undefined ? null : category_id
+    let bindCategoryId = category_id === undefined ? null : category_id
+    // Verify the category belongs to this user (prevents cross-tenant category assignment)
+    if (bindCategoryId !== null) {
+      const ownedCategory = await db.prepare(
+        'SELECT id FROM categories WHERE id = ? AND owner_email = ?'
+      ).bind(bindCategoryId, userEmail).first()
+      if (!ownedCategory) bindCategoryId = null
+    }
     // Default is_draft to true for new docs if undefined
     const bindIsDraft = is_draft === undefined || is_draft === true ? 1 : 0
     const bindIsPublished = bindIsDraft ? 0 : 1
@@ -163,7 +170,14 @@ adminRoutes.put('/documents/:id', async (c) => {
     const frontmatterJson = frontmatter ? JSON.stringify(frontmatter) : null
 
     // Sanitise inputs for D1
-    const bindCategoryId = category_id === undefined ? null : category_id
+    let bindCategoryId = category_id === undefined ? null : category_id
+    // Verify the category belongs to this user (prevents cross-tenant category assignment)
+    if (bindCategoryId !== null) {
+      const ownedCategory = await db.prepare(
+        'SELECT id FROM categories WHERE id = ? AND owner_email = ?'
+      ).bind(bindCategoryId, userEmail).first()
+      if (!ownedCategory) bindCategoryId = null
+    }
 
     const bindIsDraft = is_draft ? 1 : 0
     const bindIsPublished = bindIsDraft ? 0 : 1
