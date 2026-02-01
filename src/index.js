@@ -13,12 +13,30 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization'],
 }))
 
+// Authentication Middleware for Multi-Tenancy
+app.use('*', async (c, next) => {
+  // Cloudflare Access sets this header for authenticated users
+  const cfEmail = c.req.header('Cf-Access-Authenticated-User-Email');
+  
+  // Fallback for local development (`wrangler dev`)
+  // Since we migrated old data to admin@example.com, using it as local default makes sense.
+  // We can change this for testing isolated users later.
+  const userEmail = cfEmail || 'admin@example.com';
+  console.log(`[AUTH] Resolved User Email: ${userEmail}`);
+  
+  // Store in Hono context for routes to access
+  c.set('userEmail', userEmail);
+  
+  await next();
+})
+
 // Health check
 app.get('/', (c) => {
   return c.json({
     message: 'Note-ADE API Server',
     version: '1.0.0',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    userEmail: c.get('userEmail')
   })
 })
 

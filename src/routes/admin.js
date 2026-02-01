@@ -2,13 +2,13 @@ import { Hono } from 'hono'
 
 const adminRoutes = new Hono()
 
-// Helper to ensure unique slugs
-async function getUniqueSlug(db, table, baseSlug, excludeId = null) {
+// Helper to ensure unique slugs per owner
+async function getUniqueSlug(db, table, baseSlug, ownerEmail, excludeId = null) {
   let slug = baseSlug;
   let count = 0;
   while (true) {
-    let query = `SELECT id FROM ${table} WHERE slug = ?`;
-    const params = [slug];
+    let query = `SELECT id FROM ${table} WHERE slug = ? AND owner_email = ?`;
+    const params = [slug, ownerEmail];
     if (excludeId) {
       query += ' AND id != ?';
       params.push(excludeId);
@@ -24,15 +24,16 @@ async function getUniqueSlug(db, table, baseSlug, excludeId = null) {
 adminRoutes.get('/documents', async (c) => {
   try {
     const db = c.env.note_ade_db
+    const userEmail = c.get('userEmail')
     const { category, status, search } = c.req.query()
 
     let query = `
       SELECT d.*, c.name as category_name, c.slug as category_slug
       FROM documents d
       LEFT JOIN categories c ON d.category_id = c.id
-      WHERE 1=1
+      WHERE d.owner_email = ?
     `
-    const params = []
+    const params = [userEmail]
 
     if (category) {
       query += ' AND d.category_id = ?'
@@ -52,7 +53,7 @@ adminRoutes.get('/documents', async (c) => {
 
     query += ' ORDER BY d.updated_at DESC'
 
-    const stmt = params.length > 0 ? db.prepare(query).bind(...params) : db.prepare(query)
+    const stmt = db.prepare(query).bind(...params)
     const documents = await stmt.all()
 
     return c.json({ documents: documents.results || [] })
@@ -66,13 +67,14 @@ adminRoutes.get('/documents/:id', async (c) => {
   try {
     const id = c.req.param('id')
     const db = c.env.note_ade_db
+    const userEmail = c.get('userEmail')
 
     const document = await db.prepare(`
       SELECT d.*, c.name as category_name
       FROM documents d
       LEFT JOIN categories c ON d.category_id = c.id
-      WHERE d.id = ?
-    `).bind(id).first()
+      WHERE d.id = ? AND d.owner_email = ?
+    `).bind(id, userEmail).first()
 
     if (!document) {
       return c.json({ error: 'Document not found' }, 404)
@@ -93,13 +95,14 @@ adminRoutes.get('/documents/:id', async (c) => {
 adminRoutes.post('/documents', async (c) => {
   try {
     const db = c.env.note_ade_db
+    const userEmail = c.get('userEmail')
     const body = await c.req.json()
 
     // Default values if undefined
     const { title, slug, content, frontmatter, category_id, is_draft } = body
 
-    // Ensure unique slug
-    const uniqueSlug = await getUniqueSlug(db, 'documents', slug);
+    // Ensure unique slug per user
+    const uniqueSlug = await getUniqueSlug(db, 'documents', slug, userEmail);
 
     // ...
 
@@ -112,9 +115,9 @@ adminRoutes.post('/documents', async (c) => {
     const bindIsPublished = bindIsDraft ? 0 : 1
 
     const result = await db.prepare(`
-      INSERT INTO documents (title, slug, content, frontmatter, category_id, is_draft, is_published)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(title, uniqueSlug, content, frontmatterJson, bindCategoryId, bindIsDraft, bindIsPublished).run()
+      INSERT INTO documents (title, slug, content, frontmatter, category_id, is_draft, is_published, owner_email)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(title, uniqueSlug, content, frontmatterJson, bindCategoryId, bindIsDraft, bindIsPublished, userEmail).run()
 
     // Create initial version
     await db.prepare(`
@@ -127,8 +130,8 @@ adminRoutes.post('/documents', async (c) => {
       SELECT d.*, c.slug as category_slug
       FROM documents d
       LEFT JOIN categories c ON d.category_id = c.id
-      WHERE d.id = ?
-    `).bind(result.meta.last_row_id).first()
+      WHERE d.id = ? AND d.owner_email = ?
+    `).bind(result.meta.last_row_id, userEmail).first()
 
     return c.json(createdDoc)
   } catch (error) {
@@ -142,14 +145,19 @@ adminRoutes.put('/documents/:id', async (c) => {
   try {
     const id = c.req.param('id')
     const db = c.env.note_ade_db
+    const userEmail = c.get('userEmail')
     const body = await c.req.json()
+
+    // Verify ownership
+    const existingDoc = await db.prepare('SELECT id FROM documents WHERE id = ? AND owner_email = ?').bind(id, userEmail).first()
+    if (!existingDoc) return c.json({ error: 'Document not found' }, 404)
 
     const { title, slug, content, frontmatter, category_id, is_draft } = body
 
     // Check if new slug conflicts with existing documents (excluding current)
     let uniqueSlug = slug;
     if (slug) {
-      uniqueSlug = await getUniqueSlug(db, 'documents', slug, id);
+      uniqueSlug = await getUniqueSlug(db, 'documents', slug, userEmail, id);
     }
 
     const frontmatterJson = frontmatter ? JSON.stringify(frontmatter) : null
@@ -157,9 +165,6 @@ adminRoutes.put('/documents/:id', async (c) => {
     // Sanitise inputs for D1
     const bindCategoryId = category_id === undefined ? null : category_id
 
-    // For update, careful about is_draft undefined.
-    // Assuming UI always sends current state. If undefined, default to 0 (published) or 1?
-    // Let's assume passed value is truthy/falsy.
     const bindIsDraft = is_draft ? 1 : 0
     const bindIsPublished = bindIsDraft ? 0 : 1
 
@@ -172,8 +177,8 @@ adminRoutes.put('/documents/:id', async (c) => {
       UPDATE documents 
       SET title = ?, slug = ?, content = ?, frontmatter = ?, category_id = ?, 
           is_draft = ?, is_published = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).bind(title, uniqueSlug, content, frontmatterJson, bindCategoryId, bindIsDraft, bindIsPublished, id).run()
+      WHERE id = ? AND owner_email = ?
+    `).bind(title, uniqueSlug, content, frontmatterJson, bindCategoryId, bindIsDraft, bindIsPublished, id, userEmail).run()
 
     // Create new version
     await db.prepare(`
@@ -193,9 +198,11 @@ adminRoutes.delete('/documents/:id', async (c) => {
   try {
     const id = c.req.param('id')
     const db = c.env.note_ade_db
+    const userEmail = c.get('userEmail')
 
-    // Delete document (cascades to versions due to FK constraint)
-    await db.prepare('DELETE FROM documents WHERE id = ?').bind(id).run()
+    // Delete document (cascades to versions)
+    const result = await db.prepare('DELETE FROM documents WHERE id = ? AND owner_email = ?').bind(id, userEmail).run()
+    if (!result.meta.changes) return c.json({ error: 'Document not found' }, 404)
 
     return c.json({ message: 'Document deleted successfully' })
   } catch (error) {
@@ -208,12 +215,14 @@ adminRoutes.post('/documents/:id/publish', async (c) => {
   try {
     const id = c.req.param('id')
     const db = c.env.note_ade_db
+    const userEmail = c.get('userEmail')
 
-    await db.prepare(`
+    const result = await db.prepare(`
       UPDATE documents 
       SET is_draft = 0, is_published = 1, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).bind(id).run()
+      WHERE id = ? AND owner_email = ?
+    `).bind(id, userEmail).run()
+    if (!result.meta.changes) return c.json({ error: 'Document not found' }, 404)
 
     return c.json({ message: 'Document published successfully' })
   } catch (error) {
@@ -225,6 +234,7 @@ adminRoutes.post('/documents/:id/publish', async (c) => {
 adminRoutes.post('/categories', async (c) => {
   try {
     const db = c.env.note_ade_db
+    const userEmail = c.get('userEmail')
     const { name, parent_id } = await c.req.json()
 
     if (!name) {
@@ -234,12 +244,12 @@ adminRoutes.post('/categories', async (c) => {
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 
     // Ensure slug uniqueness
-    const uniqueSlug = await getUniqueSlug(db, 'categories', slug);
+    const uniqueSlug = await getUniqueSlug(db, 'categories', slug, userEmail);
 
     const result = await db.prepare(`
-      INSERT INTO categories (name, slug, parent_id, sidebar_position)
-      VALUES (?, ?, ?, 0)
-    `).bind(name, uniqueSlug, parent_id || null).run()
+      INSERT INTO categories (name, slug, parent_id, sidebar_position, owner_email)
+      VALUES (?, ?, ?, 0, ?)
+    `).bind(name, uniqueSlug, parent_id || null, userEmail).run()
 
     return c.json({
       id: result.meta.last_row_id,
@@ -258,22 +268,28 @@ adminRoutes.post('/categories', async (c) => {
 adminRoutes.post('/archive', async (c) => {
   try {
     const db = c.env.note_ade_db
+    const userEmail = c.get('userEmail')
     const { id, type } = await c.req.json()
 
     if (!id || !type) {
       return c.json({ error: 'ID and Type are required' }, 400)
     }
 
-    // 1. Find or Create "Archived" category
-    let archiveCat = await db.prepare('SELECT id FROM categories WHERE slug = ?').bind('archived').first()
+    // 1. Find or Create "Archived" category for this user
+    let archiveCat = await db.prepare('SELECT id FROM categories WHERE slug = ? AND owner_email = ?').bind('archived', userEmail).first()
 
     if (!archiveCat) {
       const result = await db.prepare(`
-        INSERT INTO categories (name, slug, parent_id, sidebar_position)
-        VALUES ('Archived', 'archived', NULL, 9999)
-      `).run()
+        INSERT INTO categories (name, slug, parent_id, sidebar_position, owner_email)
+        VALUES ('Archived', 'archived', NULL, 9999, ?)
+      `).bind(userEmail).run()
       archiveCat = { id: result.meta.last_row_id }
     }
+
+    // Verify ownership of target
+    const targetTable = type === 'category' ? 'categories' : 'documents'
+    const exists = await db.prepare(`SELECT id FROM ${targetTable} WHERE id = ? AND owner_email = ?`).bind(id, userEmail).first()
+    if (!exists) return c.json({ error: 'Item not found' }, 404)
 
     // 2. Move item to Archived
     if (type === 'category') {
@@ -282,9 +298,9 @@ adminRoutes.post('/archive', async (c) => {
         return c.json({ error: 'Cannot archive the Archive category' }, 400)
       }
 
-      await db.prepare('UPDATE categories SET parent_id = ? WHERE id = ?').bind(archiveCat.id, id).run()
+      await db.prepare('UPDATE categories SET parent_id = ? WHERE id = ? AND owner_email = ?').bind(archiveCat.id, id, userEmail).run()
     } else if (type === 'doc') {
-      await db.prepare('UPDATE documents SET category_id = ? WHERE id = ?').bind(archiveCat.id, id).run()
+      await db.prepare('UPDATE documents SET category_id = ? WHERE id = ? AND owner_email = ?').bind(archiveCat.id, id, userEmail).run()
     } else {
       return c.json({ error: 'Invalid type' }, 400)
     }

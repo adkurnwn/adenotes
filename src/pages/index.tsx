@@ -7,6 +7,8 @@ import HomepageFeatures from '@site/src/components/HomepageFeatures';
 import Heading from '@theme/Heading';
 import { useEffect, useState } from 'react';
 import ExecutionEnvironment from '@docusaurus/ExecutionEnvironment';
+import { useLocation } from '@docusaurus/router';
+import DatabaseDocument from '@site/src/components/DatabaseDocument';
 
 import styles from './index.module.css';
 
@@ -21,7 +23,7 @@ function HomepageHeader() {
     // Fetch some basic stats from our API
     fetch('/api/content/manifest')
       .then(res => res.json())
-      .then(data => {
+      .then((data: any) => {
         setStats({
           documents: data.documents?.length || 0,
           categories: 0 // Will add category count later
@@ -45,7 +47,7 @@ function HomepageHeader() {
         <div className={styles.buttons}>
           <Link
             className="button button--secondary button--lg"
-            to="/intro">
+            to="#/getting-started/intro">
             Open Notes
           </Link>
         </div>
@@ -56,6 +58,12 @@ function HomepageHeader() {
 
 export default function Home(): ReactNode {
   const {siteConfig} = useDocusaurusContext();
+  const location = useLocation();
+
+  if (ExecutionEnvironment.canUseDOM && location.hash && location.hash.length > 1) {
+    return <DatabaseDocument />;
+  }
+
   return (
     <Layout
       title={`${siteConfig.title}`}

@@ -6,15 +6,16 @@ const contentRoutes = new Hono()
 contentRoutes.get('/sidebar', async (c) => {
   try {
     const db = c.env.note_ade_db
+    const userEmail = c.get('userEmail')
 
     // Get categories with their documents
     const categories = await db.prepare(`
       SELECT c.*, d.id as doc_id, d.title as doc_title, d.slug as doc_slug
       FROM categories c
-      LEFT JOIN documents d ON c.id = d.category_id AND d.is_published = 1
-      WHERE c.slug != 'archived'
+      LEFT JOIN documents d ON c.id = d.category_id AND d.is_published = 1 AND d.owner_email = ?
+      WHERE c.slug != 'archived' AND c.owner_email = ?
       ORDER BY c.sidebar_position, d.sidebar_position
-    `).all()
+    `).bind(userEmail, userEmail).all()
 
     // Build hierarchical structure
     // Build hierarchical structure
@@ -24,9 +25,9 @@ contentRoutes.get('/sidebar', async (c) => {
     const uncategorized = await db.prepare(`
       SELECT id, title, slug 
       FROM documents 
-      WHERE category_id IS NULL AND is_published = 1
+      WHERE category_id IS NULL AND is_published = 1 AND owner_email = ?
       ORDER BY updated_at DESC
-    `).all()
+    `).bind(userEmail).all()
 
     if (uncategorized.results && uncategorized.results.length > 0) {
       sidebarStructure.push(...uncategorized.results.map(doc => ({
@@ -48,13 +49,14 @@ contentRoutes.get('/documents/:slug', async (c) => {
   try {
     const slug = c.req.param('slug')
     const db = c.env.note_ade_db
+    const userEmail = c.get('userEmail')
 
     const document = await db.prepare(`
       SELECT d.*, c.name as category_name, c.slug as category_slug
       FROM documents d
       LEFT JOIN categories c ON d.category_id = c.id
-      WHERE d.slug = ? AND d.is_published = 1
-    `).bind(slug).first()
+      WHERE d.slug = ? AND d.is_published = 1 AND d.owner_email = ?
+    `).bind(slug, userEmail).first()
 
     if (!document) {
       return c.json({ error: 'Document not found' }, 404)
@@ -85,14 +87,15 @@ contentRoutes.get('/documents/:slug', async (c) => {
 contentRoutes.get('/manifest', async (c) => {
   try {
     const db = c.env.note_ade_db
+    const userEmail = c.get('userEmail')
 
     const documents = await db.prepare(`
       SELECT d.slug, d.title, d.updated_at, c.slug as category_slug
       FROM documents d
       LEFT JOIN categories c ON d.category_id = c.id
-      WHERE d.is_published = 1
+      WHERE d.is_published = 1 AND d.owner_email = ?
       ORDER BY d.updated_at DESC
-    `).all()
+    `).bind(userEmail).all()
 
     return c.json({
       documents: documents.results || [],
@@ -107,13 +110,14 @@ contentRoutes.get('/manifest', async (c) => {
 contentRoutes.get('/search-index', async (c) => {
   try {
     const db = c.env.note_ade_db
+    const userEmail = c.get('userEmail')
 
     const documents = await db.prepare(`
       SELECT d.title, d.slug, d.content, d.frontmatter, c.name as category_name
       FROM documents d
       LEFT JOIN categories c ON d.category_id = c.id
-      WHERE d.is_published = 1
-    `).all()
+      WHERE d.is_published = 1 AND d.owner_email = ?
+    `).bind(userEmail).all()
 
     const searchIndex = (documents.results || []).map(doc => {
       const frontmatter = doc.frontmatter ? JSON.parse(doc.frontmatter) : {}

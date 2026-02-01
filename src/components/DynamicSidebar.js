@@ -22,12 +22,18 @@ export default function DynamicSidebar({ className, isHidden, onCollapse }) {
     const location = useLocation();
 
     useEffect(() => {
-        const items = getSidebarStructure();
-        if (items && items.length > 0) {
-            setSidebarItems(items);
-        } else {
-            fetchSidebar();
-        }
+        const handlePathChange = () => {
+            const items = getSidebarStructure();
+            if (items && items.length > 0) {
+                setSidebarItems(items);
+            } else {
+                fetchSidebar();
+            }
+        };
+
+        handlePathChange();
+        window.addEventListener('hashchange', handlePathChange);
+        return () => window.removeEventListener('hashchange', handlePathChange);
     }, []);
 
     useEffect(() => {
@@ -40,7 +46,7 @@ export default function DynamicSidebar({ className, isHidden, onCollapse }) {
 
     const fetchSidebar = async () => {
         try {
-            const response = await fetch('/api/content/sidebar');
+            const response = await fetch('/api/content/sidebar', { credentials: 'same-origin' });
             if (response.ok) {
                 const data = await response.json();
                 const items = data.sidebar || [];
@@ -79,12 +85,13 @@ export default function DynamicSidebar({ className, isHidden, onCollapse }) {
     };
 
     const findCurrentCategory = (items, currentPath) => {
-        const path = currentPath.replace(/^\//, '');
+        const path = currentPath.replace(/^#\/?/, '');
         for (const item of items) {
             if (item.type === 'category') {
-                const hasActiveChild = item.items.some(child =>
-                    child.id === path || currentPath.endsWith(child.id) || (child.href && child.href.endsWith(path))
-                );
+                const hasActiveChild = item.items.some(child => {
+                    const childId = child.href ? child.href.replace(/^\//, '') : child.id;
+                    return childId === path || path.endsWith(childId);
+                });
                 if (hasActiveChild) return item.customProps?.categoryId;
                 const childResult = findCurrentCategory(item.items, currentPath);
                 if (childResult) return childResult;
@@ -94,14 +101,14 @@ export default function DynamicSidebar({ className, isHidden, onCollapse }) {
     };
 
     const handleCreatePageAction = () => {
-        const currentPath = location.pathname;
+        const currentPath = location.hash.replace(/^#\/?/, '');
         const fallbackId = findCurrentCategory(sidebarItems, currentPath);
 
         let categoryId = null;
         if (contextMenu.targetType === 'category') categoryId = contextMenu.targetId;
         else if (!contextMenu.targetId) categoryId = fallbackId;
 
-        const url = `/new${categoryId ? `?categoryId=${categoryId}` : ''}`;
+        const url = `/#/new${categoryId ? `?categoryId=${categoryId}` : ''}`;
         window.location.href = url;
     };
 
@@ -110,7 +117,8 @@ export default function DynamicSidebar({ className, isHidden, onCollapse }) {
             const response = await fetch('/api/admin/categories', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, parent_id })
+                body: JSON.stringify({ name, parent_id }),
+                credentials: 'same-origin'
             });
             if (response.ok) fetchSidebar();
             else {
@@ -159,7 +167,8 @@ export default function DynamicSidebar({ className, isHidden, onCollapse }) {
                 body: JSON.stringify({
                     id: contextMenu.targetId,
                     type: contextMenu.targetType
-                })
+                }),
+                credentials: 'same-origin'
             });
             if (response.ok) {
                 setDeleteModalOpen(false);

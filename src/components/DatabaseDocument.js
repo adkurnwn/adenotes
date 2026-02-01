@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import { updateSidebarCache } from '../plugins/database-content-plugin/clientModule';
+import CodeBlock from '@theme/CodeBlock';
 import DocumentEditor from './DocumentEditor';
 import ConfirmationModal from './ConfirmationModal';
 import styles from './DatabaseDocument.module.css';
@@ -18,7 +19,7 @@ import ReactDOM from 'react-dom';
  */
 export default function DatabaseDocument(props) {
   const { siteConfig } = useDocusaurusContext();
-  const { documentData, NotFoundComponent } = props;
+  const { NotFoundComponent } = props;
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,7 +29,6 @@ export default function DatabaseDocument(props) {
   const [mounted, setMounted] = useState(false);
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const hasFetched = useRef(false);
-
   useEffect(() => {
     if (!ExecutionEnvironment.canUseDOM) return;
     setMounted(true);
@@ -44,9 +44,15 @@ export default function DatabaseDocument(props) {
       }
     };
 
+    const handleHashChange = () => {
+      // Re-trigger effects on hash change
+      setIsMobileSidebarOpen(false);
+    };
+
     const options = { capture: true, passive: false };
     window.addEventListener('click', handleNavbarToggle, options);
     window.addEventListener('touchstart', handleNavbarToggle, options);
+    window.addEventListener('hashchange', handleHashChange);
 
     setIsMobileSidebarOpen(false);
     window.document.body.classList.add('custom-db-doc-active');
@@ -54,49 +60,54 @@ export default function DatabaseDocument(props) {
     return () => {
       window.removeEventListener('click', handleNavbarToggle, options);
       window.removeEventListener('touchstart', handleNavbarToggle, options);
+      window.removeEventListener('hashchange', handleHashChange);
       window.document.body.classList.remove('custom-db-doc-active');
     };
-  }, [typeof window !== 'undefined' ? window.location.pathname : null]);
+  }, []);
 
+  // Handle SPA Routing via Hash
   useEffect(() => {
     if (!ExecutionEnvironment.canUseDOM) {
       setLoading(false);
       return;
     }
 
-    // Handle New Document Mode
-    // Check path robustly (handling trailing slash)
-    const normalizedPath = window.location.pathname.replace(/\/$/, '');
+    const handleRoute = () => {
+      const hash = window.location.hash;
+      const normalizedPath = hash.replace(/^#\/?/, '').replace(/\/$/, '');
 
-    if (normalizedPath === '/new') {
-      const params = new URLSearchParams(window.location.search);
-      setDocument({
-        id: null,
-        title: 'New Page',
-        slug: 'new-page', // Placeholder
-        content: '# New Page\n\nStart writing...',
-        category_id: params.get('categoryId') || null
-      });
-      setIsEditing(true);
-      setLoading(false);
-      hasFetched.current = true; // Prevent further fetching
-      return;
-    }
-
-    if (documentData && Object.keys(documentData).length > 0) {
-      setDocument(documentData);
-      setLoading(false);
-      return;
-    }
-
-    if (!hasFetched.current) {
-      hasFetched.current = true;
-      const docSlug = normalizedPath.split('/').pop();
-      // Ensure we don't try to fetch 'new' as a document if something clipped above
-      if (docSlug && docSlug !== 'new') {
-        fetchDocumentBySlug(docSlug);
+      if (normalizedPath === 'new') {
+        const params = new URLSearchParams(window.location.search);
+        setDocument({
+          id: null,
+          title: 'New Page',
+          slug: 'new-page', // Placeholder
+          content: '# New Page\n\nStart writing...',
+          category_id: params.get('categoryId') || null
+        });
+        setIsEditing(true);
+        setLoading(false);
+        return;
       }
-    }
+
+      if (!normalizedPath || normalizedPath === '') {
+        setDocument(null);
+        setLoading(false);
+        return;
+      }
+
+      const docSlug = normalizedPath.split('/').pop();
+      if (docSlug) {
+        fetchDocumentBySlug(docSlug);
+      } else {
+        setLoading(false);
+      }
+    };
+
+    handleRoute();
+
+    window.addEventListener('hashchange', handleRoute);
+    return () => window.removeEventListener('hashchange', handleRoute);
   }, []);
 
   const fetchDocumentBySlug = async (slug) => {
@@ -104,7 +115,11 @@ export default function DatabaseDocument(props) {
 
     try {
       setLoading(true);
-      const response = await fetch(`/api/content/documents/${slug}`);
+      const response = await fetch(`/api/content/documents/${slug}`, {
+        // Essential to pass Cloudflare Access authentication cookies
+        credentials: 'same-origin'
+      });
+      
       if (!response.ok) throw new Error(`Document not found: ${slug}`);
 
       const data = await response.json();
@@ -145,7 +160,8 @@ export default function DatabaseDocument(props) {
       const response = await fetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        credentials: 'same-origin'
       });
 
       if (!response.ok) {
@@ -163,7 +179,7 @@ export default function DatabaseDocument(props) {
             const newPath = savedDoc.category_slug
               ? `/${savedDoc.category_slug}/${savedDoc.slug}`
               : `/${savedDoc.slug}`;
-            window.location.href = newPath;
+            window.location.hash = newPath;
           }
         });
       } else {
@@ -190,7 +206,7 @@ export default function DatabaseDocument(props) {
 
   // SSR fallback
   if (!ExecutionEnvironment.canUseDOM) {
-    return <LoadingLayout />;
+    return <div style={{ padding: '20px', textAlign: 'center' }}>Loading application...</div>;
   }
 
   if (loading) return <LoadingLayout />;
@@ -219,10 +235,41 @@ export default function DatabaseDocument(props) {
 
   if (!document) {
     return (
-      <Layout title="No Document">
-        <main className="container margin-vert--lg">
-          <h1>No Document Data</h1>
-        </main>
+      <Layout title="Welcome">
+        <div className={styles.container}>
+          {/* Desktop Sidebar (Hidden on Mobile) */}
+          <aside className={`${styles.desktopSidebar} ${isSidebarHidden ? styles.sidebarHidden : ''} custom-sidebar-aside`}>
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <DynamicSidebar isHidden={isSidebarHidden} onCollapse={() => setIsSidebarHidden(!isSidebarHidden)} />
+            </div>
+          </aside>
+
+          {/* Mobile Sidebar Portal */}
+          {mounted && ReactDOM.createPortal(
+            <div className={styles.mobilePortalContainer}>
+              <div
+                className={`${styles.mobileBackdrop} ${isMobileSidebarOpen ? styles.mobileBackdropVisible : ''}`}
+                onClick={() => setIsMobileSidebarOpen(false)}
+              />
+              <aside className={`${styles.mobileDrawer} ${isMobileSidebarOpen ? styles.mobileDrawerOpen : ''}`}>
+                <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <DynamicSidebar isHidden={false} />
+                </div>
+              </aside>
+            </div>,
+            window.document.body
+          )}
+
+          <main className={styles.mainContent}>
+            <div className="container padding-top--md padding-bottom--lg margin-vert--lg text--center">
+              <h1>Welcome to Your Notes</h1>
+              <p>Select a document from the sidebar to start reading, or create a new one.</p>
+              <button className="button button--primary" onClick={() => window.location.hash = '/new'}>
+                Create New Page
+              </button>
+            </div>
+          </main>
+        </div>
       </Layout>
     );
   }

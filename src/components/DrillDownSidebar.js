@@ -11,7 +11,7 @@ export default function DrillDownSidebar({ sidebarItems, isHidden, onCollapse, o
 
     // Auto-navigate to current active item on load
     useEffect(() => {
-        const path = location.pathname.replace(/^\//, '');
+        const path = (location.hash || '#/').replace(/^#\/?/, '');
         const lineage = findLineage(sidebarItems, path);
 
         // If lineage found, we want the stack to start AFTER the root level
@@ -21,7 +21,7 @@ export default function DrillDownSidebar({ sidebarItems, isHidden, onCollapse, o
         } else {
             setViewStack([]);
         }
-    }, [location.pathname, sidebarItems]);
+    }, [location.hash, sidebarItems]);
 
     const isRootView = viewStack.length === 0;
 
@@ -54,8 +54,8 @@ export default function DrillDownSidebar({ sidebarItems, isHidden, onCollapse, o
                 </a>
             ) : (
                 <Link
-                    to={item.href || `/${item.id}`}
-                    className={`menu__link ${location.pathname === (item.href || `/${item.id}`) ? 'menu__link--active' : ''}`}
+                    to={item.href ? `#${item.href}` : `#/${item.id}`}
+                    className={`menu__link ${location.hash === (item.href ? `#${item.href}` : `#/${item.id}`) ? 'menu__link--active' : ''}`}
                     data-context-id={item.customProps?.docId}
                     data-context-type="doc"
                     data-context-label={item.label}
@@ -72,7 +72,7 @@ export default function DrillDownSidebar({ sidebarItems, isHidden, onCollapse, o
 
     // Effect to auto-expand root if active item is inside it
     useEffect(() => {
-        const path = location.pathname.replace(/^\//, '');
+        const path = (location.hash || '#/').replace(/^#\/?/, '');
         sidebarItems.forEach((item, idx) => {
             if (item.type === 'category') {
                 // Check if active path is inside this hierarchy
@@ -85,7 +85,7 @@ export default function DrillDownSidebar({ sidebarItems, isHidden, onCollapse, o
                 }
             }
         });
-    }, [location.pathname, sidebarItems]);
+    }, [location.hash, sidebarItems]);
 
     const toggleRoot = (idx) => {
         setCollapsedRoots(prev => ({
@@ -176,8 +176,8 @@ export default function DrillDownSidebar({ sidebarItems, isHidden, onCollapse, o
                             <li className="menu__list-item" key={idx}>
                                 {rootItem.type === 'doc' && (
                                     <Link
-                                        to={rootItem.href || `/${rootItem.id}`}
-                                        className={`menu__link ${location.pathname === (rootItem.href || `/${rootItem.id}`) ? 'menu__link--active' : ''}`}
+                                        to={rootItem.href ? `#${rootItem.href}` : `#/${rootItem.id}`}
+                                        className={`menu__link ${location.hash === (rootItem.href ? `#${rootItem.href}` : `#/${rootItem.id}`) ? 'menu__link--active' : ''}`}
                                         data-context-id={rootItem.customProps?.docId}
                                         data-context-type="doc"
                                         data-context-label={rootItem.label}
